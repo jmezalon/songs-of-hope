@@ -1,7 +1,7 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { buttonVariants } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { AddSongForm } from "@/components/forms/add-song-form"
 
 export default function NewSongPage() {
   return (
@@ -18,19 +18,7 @@ export default function NewSongPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Song Details</CardTitle>
-          <CardDescription>
-            Fill in the information for the new song
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex h-64 items-center justify-center text-muted-foreground">
-            Song form will be implemented here
-          </div>
-        </CardContent>
-      </Card>
+      <AddSongForm />
     </div>
   )
 }
