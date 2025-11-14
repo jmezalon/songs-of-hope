@@ -220,7 +220,7 @@ export type SearchResult = {
 }
 
 // API Response types
-export type ApiResponse<T = any> = {
+export type ApiResponse<T = unknown> = {
   success: boolean
   data?: T
   error?: string
@@ -298,6 +298,6 @@ export type ContributionData = {
   songId?: string
   title?: string
   description?: string
-  changes?: Record<string, any>
+  changes?: Record<string, unknown>
   newSongData?: Partial<SongFormData>
 }

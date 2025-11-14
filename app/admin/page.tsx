@@ -9,8 +9,6 @@ import {
   Plus,
   FileText,
   CheckCircle,
-  Clock,
-  AlertCircle,
 } from "lucide-react"
 import {
   Card,

@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, ThemeCategory } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
@@ -161,7 +162,7 @@ async function main() {
       create: {
         name: themeData.name,
         nameKreyol: themeData.nameKreyol,
-        category: themeData.category as any,
+        category: themeData.category as ThemeCategory,
         isActive: true,
       },
     })
@@ -171,7 +172,6 @@ async function main() {
 
   // Create a sample admin user (password: "admin123" - hashed)
   // Note: In production, you should use bcryptjs to hash the password
-  const bcrypt = require('bcryptjs')
   const hashedPassword = await bcrypt.hash('admin123', 10)
 
   await prisma.user.upsert({
