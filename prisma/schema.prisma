@@ -1,0 +1,463 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// COLLECTION & SECTION MODELS
+// ============================================================================
+
+model Collection {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  nameKreyol  String?
+  description String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sections    Section[]
+  songs       Song[]
+
+  @@index([isActive, sortOrder])
+  @@map("collections")
+}
+
+model Section {
+  id           String     @id @default(cuid())
+  collectionId String
+  name         String
+  nameKreyol   String?
+  description  String?
+  sortOrder    Int        @default(0)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  songs        Song[]
+
+  @@unique([collectionId, name])
+  @@index([collectionId, sortOrder])
+  @@map("sections")
+}
+
+// ============================================================================
+// SONG MODELS
+// ============================================================================
+
+enum Language {
+  FRANCAIS
+  KREYOL
+  BILINGUAL
+  ENGLISH
+}
+
+enum SongStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  PENDING_REVIEW
+}
+
+enum CopyrightStatus {
+  PUBLIC_DOMAIN
+  COPYRIGHTED
+  CREATIVE_COMMONS
+  UNKNOWN
+}
+
+model Song {
+  id                String           @id @default(cuid())
+
+  // Basic Information
+  title             String
+  titleKreyol       String?
+  subtitle          String?
+  subtitleKreyol    String?
+
+  // Collection & Section
+  collectionId      String
+  sectionId         String?
+  songNumber        Int?             // Song number within the section
+  language          Language         @default(BILINGUAL)
+
+  // Companion Song (NOT translation - different song with same number)
+  companionSongId   String?          @unique
+
+  // Musical Information
+  tune              String?          // Tune name
+  meter             String?          // e.g., "8.7.8.7.D"
+  musicalKey        String?          // e.g., "D Major"
+  timeSignature     String?          // e.g., "4/4", "3/4"
+  tempo             String?          // e.g., "Moderato", "Allegro"
+
+  // Attribution
+  author            String?          // Lyricist
+  authorKreyol      String?
+  composer          String?          // Music composer
+  translator        String?
+  arranger          String?
+  yearWritten       Int?
+  copyrightStatus   CopyrightStatus  @default(UNKNOWN)
+  copyrightInfo     String?
+
+  // Metadata
+  firstLine         String?          // First line for searching
+  firstLineKreyol   String?
+  summary           String?          // Brief description
+  notes             String?          // Additional notes
+
+  // Popularity & Stats
+  popularityScore   Float            @default(0)
+  viewCount         Int              @default(0)
+  favoriteCount     Int              @default(0)
+
+  // Status
+  status            SongStatus       @default(PUBLISHED)
+  isVerified        Boolean          @default(false)
+
+  // Timestamps
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  publishedAt       DateTime?
+
+  // Relations
+  collection        Collection       @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  section           Section?         @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  companionSong     Song?            @relation("SongCompanion", fields: [companionSongId], references: [id], onDelete: SetNull)
+  companionOf       Song?            @relation("SongCompanion")
+
+  verses            Verse[]
+  themes            SongTheme[]
+  biblicalRefs      SongBiblicalReference[]
+  media             Media[]
+  favorites         Favorite[]
+  playlistSongs     PlaylistSong[]
+  searchHistory     SearchHistory[]
+  contributions     Contribution[]
+
+  @@unique([collectionId, sectionId, songNumber, language])
+  @@index([collectionId, sectionId])
+  @@index([language])
+  @@index([status])
+  @@index([popularityScore])
+  @@index([title])
+  @@index([songNumber, sectionId])
+  @@map("songs")
+}
+
+// ============================================================================
+// VERSE & LINE MODELS
+// ============================================================================
+
+enum VerseType {
+  VERSE
+  CHORUS
+  REFRAIN
+  BRIDGE
+  INTRO
+  OUTRO
+  CODA
+}
+
+model Verse {
+  id              String     @id @default(cuid())
+  songId          String
+  type            VerseType  @default(VERSE)
+  verseNumber     Int?       // e.g., 1, 2, 3 for verses
+  label           String?    // e.g., "Chorus", "Verse 1"
+  labelKreyol     String?
+  sortOrder       Int        @default(0)
+  isRepeated      Boolean    @default(false)
+  repeatAfterVerse Int?      // Which verse to repeat after
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  song            Song       @relation(fields: [songId], references: [id], onDelete: Cascade)
+  lines           Line[]
+
+  @@index([songId, sortOrder])
+  @@map("verses")
+}
+
+model Line {
+  id              String    @id @default(cuid())
+  verseId         String
+  text            String
+  textKreyol      String?
+  lineNumber      Int
+  isIndented      Boolean   @default(false)
+  indent          Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  verse           Verse     @relation(fields: [verseId], references: [id], onDelete: Cascade)
+
+  @@index([verseId, lineNumber])
+  @@map("lines")
+}
+
+// ============================================================================
+// THEME MODELS
+// ============================================================================
+
+enum ThemeCategory {
+  OCCASION      // Christmas, Easter, Funeral, etc.
+  SEASON        // Advent, Lent, Ordinary Time
+  TOPIC         // Prayer, Worship, Thanksgiving, etc.
+  MOOD          // Joyful, Contemplative, Penitential
+  LITURGICAL    // Opening, Communion, Closing
+  BIBLICAL      // Psalm, Gospel-based, etc.
+}
+
+model Theme {
+  id              String        @id @default(cuid())
+  name            String        @unique
+  nameKreyol      String?
+  category        ThemeCategory
+  description     String?
+  sortOrder       Int           @default(0)
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  songs           SongTheme[]
+
+  @@index([category, isActive])
+  @@map("themes")
+}
+
+model SongTheme {
+  id        String   @id @default(cuid())
+  songId    String
+  themeId   String
+  createdAt DateTime @default(now())
+
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  theme     Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
+
+  @@unique([songId, themeId])
+  @@index([themeId])
+  @@map("song_themes")
+}
+
+// ============================================================================
+// BIBLICAL REFERENCE MODEL
+// ============================================================================
+
+model BiblicalReference {
+  id          String    @id @default(cuid())
+  book        String    // e.g., "Psalm", "John"
+  chapter     Int
+  verseStart  Int
+  verseEnd    Int?
+  text        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  songs       SongBiblicalReference[]
+
+  @@index([book, chapter])
+  @@map("biblical_references")
+}
+
+model SongBiblicalReference {
+  id                   String             @id @default(cuid())
+  songId               String
+  biblicalReferenceId  String
+  createdAt            DateTime           @default(now())
+
+  song                 Song               @relation(fields: [songId], references: [id], onDelete: Cascade)
+  biblicalReference    BiblicalReference  @relation(fields: [biblicalReferenceId], references: [id], onDelete: Cascade)
+
+  @@unique([songId, biblicalReferenceId])
+  @@index([biblicalReferenceId])
+  @@map("song_biblical_references")
+}
+
+// ============================================================================
+// MEDIA MODEL
+// ============================================================================
+
+enum MediaType {
+  SHEET_MUSIC
+  AUDIO
+  VIDEO
+  IMAGE
+  PDF
+}
+
+model Media {
+  id              String     @id @default(cuid())
+  songId          String
+  type            MediaType
+  title           String?
+  url             String
+  thumbnailUrl    String?
+  fileSize        Int?       // in bytes
+  duration        Int?       // in seconds for audio/video
+  mimeType        String?
+  isPublic        Boolean    @default(true)
+  sortOrder       Int        @default(0)
+  uploadedBy      String?    // userId
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  song            Song       @relation(fields: [songId], references: [id], onDelete: Cascade)
+  uploader        User?      @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  @@index([songId, type])
+  @@map("media")
+}
+
+// ============================================================================
+// USER MODELS
+// ============================================================================
+
+enum UserRole {
+  ADMIN
+  CONTRIBUTOR
+  USER
+}
+
+model User {
+  id                String          @id @default(cuid())
+  email             String          @unique
+  emailVerified     DateTime?
+  name              String?
+  password          String
+  role              UserRole        @default(USER)
+  isActive          Boolean         @default(true)
+  preferredLanguage Language?       @default(BILINGUAL)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  lastLoginAt       DateTime?
+
+  favorites         Favorite[]
+  playlists         Playlist[]
+  searchHistory     SearchHistory[]
+  contributions     Contribution[]
+  mediaUploads      Media[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// ============================================================================
+// USER INTERACTION MODELS
+// ============================================================================
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  songId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, songId])
+  @@index([userId])
+  @@index([songId])
+  @@map("favorites")
+}
+
+model Playlist {
+  id          String         @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  isPublic    Boolean        @default(false)
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songs       PlaylistSong[]
+
+  @@index([userId])
+  @@map("playlists")
+}
+
+model PlaylistSong {
+  id         String   @id @default(cuid())
+  playlistId String
+  songId     String
+  sortOrder  Int      @default(0)
+  addedAt    DateTime @default(now())
+
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  song       Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, songId])
+  @@index([playlistId, sortOrder])
+  @@map("playlist_songs")
+}
+
+model SearchHistory {
+  id         String   @id @default(cuid())
+  userId     String?
+  songId     String?
+  query      String
+  resultCount Int     @default(0)
+  searchedAt DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song       Song?    @relation(fields: [songId], references: [id], onDelete: SetNull)
+
+  @@index([userId, searchedAt])
+  @@index([query])
+  @@map("search_history")
+}
+
+// ============================================================================
+// CONTRIBUTION MODEL
+// ============================================================================
+
+enum ContributionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_REVISION
+}
+
+enum ContributionType {
+  NEW_SONG
+  CORRECTION
+  TRANSLATION
+  METADATA
+  MEDIA
+}
+
+model Contribution {
+  id              String              @id @default(cuid())
+  userId          String
+  songId          String?             // null for new song submissions
+  type            ContributionType
+  status          ContributionStatus  @default(PENDING)
+  data            Json                // Flexible field for contribution data
+  notes           String?
+  reviewNotes     String?
+  reviewedBy      String?             // userId of reviewer
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  reviewedAt      DateTime?
+
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song            Song?               @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([songId])
+  @@index([status])
+  @@map("contributions")
+}
