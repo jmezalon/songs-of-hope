@@ -17,9 +17,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { formatNumber, formatDate } from "@/lib/utils"
+import { formatNumber, formatDate, cn } from "@/lib/utils"
 
 // Mock data - will be replaced with actual database queries
 const dashboardStats = {
@@ -140,12 +140,10 @@ export default function AdminDashboard() {
             <FileText className="mr-2 h-4 w-4" />
             Export Data
           </Button>
-          <Button size="sm" asChild>
-            <Link href="/admin/songs/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Song
-            </Link>
-          </Button>
+          <Link href="/admin/songs/new" className={cn(buttonVariants({ size: "sm" }))}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Song
+          </Link>
         </div>
       </div>
 
@@ -310,9 +308,9 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
-            <Button variant="outline" className="mt-4 w-full" asChild>
-              <Link href="/admin/songs">View All Songs</Link>
-            </Button>
+            <Link href="/admin/songs" className={cn(buttonVariants({ variant: "outline" }), "mt-4 w-full")}>
+              View All Songs
+            </Link>
           </CardContent>
         </Card>
 
@@ -349,9 +347,9 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
-            <Button variant="outline" className="mt-4 w-full" asChild>
-              <Link href="/admin/users">Review Contributions</Link>
-            </Button>
+            <Link href="/admin/users" className={cn(buttonVariants({ variant: "outline" }), "mt-4 w-full")}>
+              Review Contributions
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -366,30 +364,22 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Button variant="outline" className="justify-start" asChild>
-              <Link href="/admin/songs/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Song
-              </Link>
-            </Button>
-            <Button variant="outline" className="justify-start" asChild>
-              <Link href="/admin/collections">
-                <BookOpen className="mr-2 h-4 w-4" />
-                Manage Collections
-              </Link>
-            </Button>
-            <Button variant="outline" className="justify-start" asChild>
-              <Link href="/admin/themes">
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Manage Themes
-              </Link>
-            </Button>
-            <Button variant="outline" className="justify-start" asChild>
-              <Link href="/admin/media">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Upload Media
-              </Link>
-            </Button>
+            <Link href="/admin/songs/new" className={cn(buttonVariants({ variant: "outline" }), "justify-start")}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add New Song
+            </Link>
+            <Link href="/admin/collections" className={cn(buttonVariants({ variant: "outline" }), "justify-start")}>
+              <BookOpen className="mr-2 h-4 w-4" />
+              Manage Collections
+            </Link>
+            <Link href="/admin/themes" className={cn(buttonVariants({ variant: "outline" }), "justify-start")}>
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Manage Themes
+            </Link>
+            <Link href="/admin/media" className={cn(buttonVariants({ variant: "outline" }), "justify-start")}>
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Upload Media
+            </Link>
           </div>
         </CardContent>
       </Card>

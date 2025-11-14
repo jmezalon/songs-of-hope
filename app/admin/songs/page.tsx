@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import Link from "next/link"
 
@@ -13,12 +13,10 @@ export default function SongsPage() {
             Manage all songs in the hymnal database
           </p>
         </div>
-        <Button asChild>
-          <Link href="/admin/songs/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Song
-          </Link>
-        </Button>
+        <Link href="/admin/songs/new" className={buttonVariants()}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Song
+        </Link>
       </div>
 
       <Card>
