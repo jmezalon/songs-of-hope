@@ -45,7 +45,16 @@ export const songFormSchema = z.object({
 
   // Conditional fields for hymnal songs
   sectionId: z.string().optional(),
-  songNumber: z.number().int().positive().optional(),
+  songNumber: z.preprocess(
+    (val) => {
+      // Handle NaN and empty values
+      if (val === "" || val === null || (typeof val === "number" && isNaN(val))) {
+        return undefined
+      }
+      return val
+    },
+    z.number().int().positive().optional()
+  ),
   language: z.enum(["FRANCAIS", "KREYOL", "BILINGUAL"]).optional(),
 
   // Basic info
@@ -68,7 +77,16 @@ export const songFormSchema = z.object({
   composer: z.string().optional(),
   translator: z.string().optional(),
   arranger: z.string().optional(),
-  yearWritten: z.number().int().min(1000).max(new Date().getFullYear()).optional(),
+  yearWritten: z.preprocess(
+    (val) => {
+      // Handle NaN and empty values
+      if (val === "" || val === null || (typeof val === "number" && isNaN(val))) {
+        return undefined
+      }
+      return val
+    },
+    z.number().int().min(1000).max(new Date().getFullYear()).optional()
+  ),
   copyrightStatus: z.enum(["PUBLIC_DOMAIN", "COPYRIGHTED", "CREATIVE_COMMONS", "UNKNOWN"]),
   copyrightInfo: z.string().optional(),
   ccliNumber: z.string().optional(),
