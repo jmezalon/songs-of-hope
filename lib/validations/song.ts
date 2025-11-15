@@ -1,5 +1,27 @@
 import { z } from "zod"
 
+// Lyric line schema
+export const lineSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  textKreyol: z.string().optional(),
+  lineNumber: z.number(),
+  isIndented: z.boolean().default(false),
+  indent: z.number().default(0),
+})
+
+// Lyric verse schema
+export const verseSchema = z.object({
+  id: z.string(),
+  type: z.enum(["VERSE", "CHORUS", "REFRAIN", "BRIDGE", "PRE_CHORUS", "INTRO", "OUTRO"]),
+  verseNumber: z.number().optional(),
+  label: z.string(),
+  labelKreyol: z.string().optional(),
+  sortOrder: z.number(),
+  isRepeated: z.boolean().default(false),
+  lines: z.array(lineSchema),
+})
+
 export const songFormSchema = z.object({
   // Step 1: Song Type & Basic Info
   songType: z.enum(["hymnal", "popular"]),
@@ -33,6 +55,9 @@ export const songFormSchema = z.object({
   copyrightStatus: z.enum(["PUBLIC_DOMAIN", "COPYRIGHTED", "CREATIVE_COMMONS", "UNKNOWN"]),
   copyrightInfo: z.string().optional(),
   ccliNumber: z.string().optional(),
+
+  // Step 4: Lyrics
+  verses: z.array(verseSchema).default([]),
 }).refine(
   (data) => {
     // If song type is hymnal, section and number are required
@@ -49,9 +74,13 @@ export const songFormSchema = z.object({
 
 export type SongFormValues = z.infer<typeof songFormSchema>
 
+export type LyricLine = z.infer<typeof lineSchema>
+export type LyricVerse = z.infer<typeof verseSchema>
+
 export const defaultValues: Partial<SongFormValues> = {
   songType: "hymnal",
   language: "FRANCAIS",
   copyrightStatus: "UNKNOWN",
   timeSignature: "4/4",
+  verses: [],
 }
