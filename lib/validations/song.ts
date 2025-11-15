@@ -22,6 +22,23 @@ export const verseSchema = z.object({
   lines: z.array(lineSchema),
 })
 
+// Biblical reference schema
+export const biblicalReferenceSchema = z.object({
+  id: z.string(),
+  book: z.string(),
+  chapter: z.number().int().positive(),
+  verseStart: z.number().int().positive(),
+  verseEnd: z.number().int().positive().optional(),
+})
+
+// Media schema
+export const mediaSchema = z.object({
+  id: z.string(),
+  type: z.enum(["SHEET_MUSIC", "AUDIO", "VIDEO", "IMAGE"]),
+  url: z.string().url(),
+  title: z.string().optional(),
+})
+
 export const songFormSchema = z.object({
   // Step 1: Song Type & Basic Info
   songType: z.enum(["hymnal", "popular"]),
@@ -58,6 +75,23 @@ export const songFormSchema = z.object({
 
   // Step 4: Lyrics
   verses: z.array(verseSchema).default([]),
+
+  // Step 5: Themes & Categorization
+  themeIds: z.array(z.string()).default([]),
+  difficulty: z.enum(["EASY", "MODERATE", "HARD"]).optional(),
+
+  // Step 6: Biblical References
+  biblicalReferences: z.array(biblicalReferenceSchema).default([]),
+
+  // Step 7: Media (Optional)
+  media: z.array(mediaSchema).default([]),
+
+  // Additional metadata
+  firstLine: z.string().optional(),
+  firstLineKreyol: z.string().optional(),
+  summary: z.string().optional(),
+  notes: z.string().optional(),
+  status: z.enum(["DRAFT", "PUBLISHED", "PENDING_REVIEW"]).default("DRAFT"),
 }).refine(
   (data) => {
     // If song type is hymnal, section and number are required
@@ -76,6 +110,8 @@ export type SongFormValues = z.infer<typeof songFormSchema>
 
 export type LyricLine = z.infer<typeof lineSchema>
 export type LyricVerse = z.infer<typeof verseSchema>
+export type BiblicalReference = z.infer<typeof biblicalReferenceSchema>
+export type MediaItem = z.infer<typeof mediaSchema>
 
 export const defaultValues: Partial<SongFormValues> = {
   songType: "hymnal",
@@ -83,4 +119,9 @@ export const defaultValues: Partial<SongFormValues> = {
   copyrightStatus: "UNKNOWN",
   timeSignature: "4/4",
   verses: [],
+  themeIds: [],
+  biblicalReferences: [],
+  media: [],
+  status: "DRAFT",
 }
+
