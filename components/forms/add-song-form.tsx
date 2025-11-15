@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useForm } from "react-hook-form"
+import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { ChevronLeft, ChevronRight, Check } from "lucide-react"
@@ -13,7 +13,13 @@ import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { FormField } from "@/components/ui/form-field"
+import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { LyricsEditor } from "@/components/forms/lyrics-editor"
+import { ThemeSelector } from "@/components/forms/theme-selector"
+import { BiblicalReferences } from "@/components/forms/biblical-references"
+import { MediaManager } from "@/components/forms/media-manager"
+import { SongReview } from "@/components/forms/song-review"
 
 interface Section {
   id: string
@@ -29,6 +35,11 @@ const steps = [
   { id: 1, name: "Song Type & Basic Info", description: "Choose song type and enter basic information" },
   { id: 2, name: "Musical Information", description: "Add musical details and metadata" },
   { id: 3, name: "Credits & Copyright", description: "Enter attribution and copyright information" },
+  { id: 4, name: "Lyrics", description: "Add song verses and lyrics" },
+  { id: 5, name: "Themes & Categories", description: "Categorize song by themes and difficulty" },
+  { id: 6, name: "Biblical References", description: "Add scripture references" },
+  { id: 7, name: "Media (Optional)", description: "Add sheet music, audio, or video links" },
+  { id: 8, name: "Review & Submit", description: "Review and submit your song" },
 ]
 
 const timeSignatures = ["2/4", "3/4", "4/4", "6/8", "9/8", "12/8"]
@@ -43,10 +54,11 @@ export function AddSongForm() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
     trigger,
   } = useForm<SongFormValues>({
-    resolver: zodResolver(songFormSchema),
+    resolver: zodResolver(songFormSchema) as Resolver<SongFormValues>,
     defaultValues,
     mode: "onChange",
   })
@@ -54,6 +66,11 @@ export function AddSongForm() {
   const songType = watch("songType")
   const language = watch("language")
   const copyrightStatus = watch("copyrightStatus")
+  const themeIds = watch("themeIds")
+  const biblicalReferences = watch("biblicalReferences")
+  const media = watch("media")
+  const difficulty = watch("difficulty")
+  const verses = watch("verses")
 
   // Fetch sections on mount
   React.useEffect(() => {
@@ -86,7 +103,8 @@ export function AddSongForm() {
     }
   }
 
-  const nextStep = async () => {
+  const nextStep = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault()
     const fieldsToValidate = getFieldsForStep(currentStep)
     const isValid = await trigger(fieldsToValidate)
     if (isValid) {
@@ -107,9 +125,19 @@ export function AddSongForm() {
         }
         return fields
       case 2:
-        return []
+        return [] // Musical info is optional
       case 3:
-        return []
+        return ["copyrightStatus"] // Copyright status is required
+      case 4:
+        return [] // Lyrics validation can be added if needed
+      case 5:
+        return [] // Themes are optional
+      case 6:
+        return [] // Biblical references are optional
+      case 7:
+        return [] // Media is optional
+      case 8:
+        return [] // Review step
       default:
         return []
     }
@@ -118,48 +146,56 @@ export function AddSongForm() {
   return (
     <div className="space-y-6">
       {/* Progress Indicator */}
-      <div className="flex items-center justify-between">
-        {steps.map((step, index) => (
-          <React.Fragment key={step.id}>
-            <div className="flex flex-col items-center flex-1">
-              <div
-                className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors",
-                  currentStep > step.id
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : currentStep === step.id
-                    ? "border-primary bg-background text-primary"
-                    : "border-muted bg-background text-muted-foreground"
-                )}
-              >
-                {currentStep > step.id ? (
-                  <Check className="h-5 w-5" />
-                ) : (
-                  <span>{step.id}</span>
-                )}
+      <div className="mb-8">
+        <div className="flex items-start justify-between">
+          {steps.map((step, index) => (
+            <React.Fragment key={step.id}>
+              {/* Step column */}
+              <div className="flex flex-col items-center" style={{ flex: index === steps.length - 1 ? '0 0 auto' : '1 1 0%' }}>
+                {/* Circle */}
+                <div
+                  className={cn(
+                    "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors shrink-0",
+                    currentStep > step.id
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : currentStep === step.id
+                      ? "border-primary bg-background text-primary"
+                      : "border-muted bg-background text-muted-foreground"
+                  )}
+                >
+                  {currentStep > step.id ? (
+                    <Check className="h-5 w-5" />
+                  ) : (
+                    <span>{step.id}</span>
+                  )}
+                </div>
+                {/* Label */}
+                <div className="mt-3 text-center w-full px-1">
+                  <p className={cn(
+                    "text-xs font-medium",
+                    currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
+                  )}>
+                    {step.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground hidden lg:block mt-1">
+                    {step.description}
+                  </p>
+                </div>
               </div>
-              <div className="mt-2 text-center">
-                <p className={cn(
-                  "text-sm font-medium",
-                  currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
-                )}>
-                  {step.name}
-                </p>
-                <p className="text-xs text-muted-foreground hidden sm:block">
-                  {step.description}
-                </p>
-              </div>
-            </div>
-            {index < steps.length - 1 && (
-              <div
-                className={cn(
-                  "h-0.5 flex-1 transition-colors mx-2 mt-[-50px]",
-                  currentStep > step.id ? "bg-primary" : "bg-muted"
-                )}
-              />
-            )}
-          </React.Fragment>
-        ))}
+              {/* Connector line */}
+              {index < steps.length - 1 && (
+                <div className="flex items-start pt-5 flex-1">
+                  <div
+                    className={cn(
+                      "h-0.5 w-full transition-colors",
+                      currentStep > step.id ? "bg-primary" : "bg-muted"
+                    )}
+                  />
+                </div>
+              )}
+            </React.Fragment>
+          ))}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -470,31 +506,113 @@ export function AddSongForm() {
                 )}
               </div>
             )}
+
+            {/* Step 4: Lyrics */}
+            {currentStep === 4 && (
+              <div className="space-y-4">
+                <LyricsEditor
+                  verses={verses || []}
+                  onChange={(updatedVerses) => setValue("verses", updatedVerses)}
+                  language={language}
+                />
+              </div>
+            )}
+
+            {/* Step 5: Themes & Categories */}
+            {currentStep === 5 && (
+              <div className="space-y-6">
+                <ThemeSelector
+                  selectedIds={themeIds || []}
+                  onChange={(ids) => setValue("themeIds", ids)}
+                />
+
+                <div className="space-y-2">
+                  <Label htmlFor="difficulty">Difficulty Level (Optional)</Label>
+                  <Select
+                    id="difficulty"
+                    value={difficulty || ""}
+                    onChange={(e) => setValue("difficulty", e.target.value as any)}
+                  >
+                    <option value="">Select difficulty...</option>
+                    <option value="EASY">Easy - Simple melody, easy to learn</option>
+                    <option value="MODERATE">Moderate - Some musical complexity</option>
+                    <option value="HARD">Hard - Complex harmonies or rhythms</option>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Biblical References */}
+            {currentStep === 6 && (
+              <div className="space-y-4">
+                <BiblicalReferences
+                  references={biblicalReferences || []}
+                  onChange={(refs) => setValue("biblicalReferences", refs)}
+                />
+              </div>
+            )}
+
+            {/* Step 7: Media */}
+            {currentStep === 7 && (
+              <div className="space-y-4">
+                <MediaManager
+                  media={media || []}
+                  onChange={(items) => setValue("media", items)}
+                />
+              </div>
+            )}
+
+            {/* Step 8: Review & Submit */}
+            {currentStep === 8 && (
+              <div className="space-y-4">
+                <SongReview
+                  data={watch()}
+                  errors={errors}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Navigation Buttons */}
         <div className="flex justify-between mt-6">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={prevStep}
-            disabled={currentStep === 1}
-          >
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Previous
-          </Button>
-
-          {currentStep < steps.length ? (
-            <Button type="button" onClick={nextStep}>
-              Next
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          ) : (
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save Song"}
+          {currentStep > 1 && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={prevStep}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Previous
             </Button>
           )}
+
+          <div className="ml-auto flex gap-2">
+            {currentStep < steps.length ? (
+              <Button type="button" onClick={nextStep}>
+                Next
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  onClick={() => setValue("status", "DRAFT")}
+                  disabled={isLoading}
+                >
+                  Save as Draft
+                </Button>
+                <Button
+                  type="submit"
+                  onClick={() => setValue("status", "PUBLISHED")}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Publishing..." : "Publish Song"}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </form>
     </div>

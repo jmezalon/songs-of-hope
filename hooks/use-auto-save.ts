@@ -15,7 +15,7 @@ export function useAutoSave<T>({
   delay = 1000,
   enabled = true,
 }: UseAutoSaveOptions<T>) {
-  const timeoutRef = useRef<NodeJS.Timeout>()
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const isFirstRender = useRef(true)
 
   useEffect(() => {
