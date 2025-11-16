@@ -164,6 +164,7 @@ enum VerseType {
   CHORUS
   REFRAIN
   BRIDGE
+  PRE_CHORUS
   INTRO
   OUTRO
   CODA
