@@ -18,13 +18,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Plus, Trash2, GripVertical, IndentDecrease, IndentIncrease } from "lucide-react"
+import { Plus, Trash2, GripVertical, IndentDecrease, IndentIncrease, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import type { LyricLine, LyricVerse } from "@/lib/validations/song"
 
 interface LyricsEditorProps {
@@ -176,6 +177,7 @@ interface VerseCardProps {
   onUpdateLine: (verseId: string, lineId: string, updates: Partial<LyricLine>) => void
   onRemoveLine: (verseId: string, lineId: string) => void
   onReorderLines: (verseId: string, activeId: string, overId: string) => void
+  onPasteLines: (verseId: string, pastedText: string, pastedTextKreyol?: string) => void
 }
 
 function VerseCard({
@@ -187,13 +189,27 @@ function VerseCard({
   onUpdateLine,
   onRemoveLine,
   onReorderLines,
+  onPasteLines,
 }: VerseCardProps) {
+  const [pastedText, setPastedText] = React.useState("")
+  const [pastedTextKreyol, setPastedTextKreyol] = React.useState("")
+  const [showPasteArea, setShowPasteArea] = React.useState(verse.lines.length === 1 && !verse.lines[0].text)
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+
+  const handlePaste = () => {
+    if (pastedText.trim()) {
+      onPasteLines(verse.id, pastedText, pastedTextKreyol || undefined)
+      setPastedText("")
+      setPastedTextKreyol("")
+      setShowPasteArea(false)
+    }
+  }
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -268,32 +284,89 @@ function VerseCard({
       </CardHeader>
 
       <CardContent className="space-y-3">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={verse.lines.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-            {verse.lines.map((line) => (
-              <SortableLine
-                key={line.id}
-                line={line}
-                verseId={verse.id}
-                language={language}
-                onUpdate={(lineId, updates) => onUpdateLine(verse.id, lineId, updates)}
-                onRemove={(lineId) => onRemoveLine(verse.id, lineId)}
-                canRemove={verse.lines.length > 1}
+        {showPasteArea ? (
+          <div className="space-y-3 p-4 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Paste Entire Verse</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPasteArea(false)}
+              >
+                Switch to line-by-line
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <Textarea
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder={language === "KREYOL" ? "Paste your Kreyòl verse here...\nEach new line will become a lyric line" : "Paste your verse here...\nEach new line will become a lyric line"}
+                rows={6}
+                className="font-mono"
               />
-            ))}
-          </SortableContext>
-        </DndContext>
+              {(language === "BILINGUAL" || language === "KREYOL") && (
+                <Textarea
+                  value={pastedTextKreyol}
+                  onChange={(e) => setPastedTextKreyol(e.target.value)}
+                  placeholder="Paste Kreyòl translation here...\nEach new line will become a lyric line"
+                  rows={6}
+                  className="font-mono"
+                />
+              )}
+            </div>
+            <Button
+              type="button"
+              onClick={handlePaste}
+              disabled={!pastedText.trim()}
+              className="w-full"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Convert to Lines
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPasteArea(true)}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Paste entire verse
+              </Button>
+            </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => onAddLine(verse.id)}
-          className="w-full mt-2"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Line
-        </Button>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={verse.lines.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+                {verse.lines.map((line) => (
+                  <SortableLine
+                    key={line.id}
+                    line={line}
+                    verseId={verse.id}
+                    language={language}
+                    onUpdate={(lineId, updates) => onUpdateLine(verse.id, lineId, updates)}
+                    onRemove={(lineId) => onRemoveLine(verse.id, lineId)}
+                    canRemove={verse.lines.length > 1}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onAddLine(verse.id)}
+              className="w-full mt-2"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Line
+            </Button>
+          </>
+        )}
       </CardContent>
     </Card>
   )
@@ -373,14 +446,42 @@ export function LyricsEditor({ verses, onChange, language = "FRANCAIS" }: Lyrics
     )
   }
 
+  const handlePasteLines = (verseId: string, pastedText: string, pastedTextKreyol?: string) => {
+    onChange(
+      verses.map((v) => {
+        if (v.id === verseId) {
+          // Split pasted text by newlines and filter out empty lines
+          const textLines = pastedText.split('\n').filter(line => line.trim())
+          const kreyolLines = pastedTextKreyol?.split('\n').filter(line => line.trim()) || []
+
+          // Create new lines from pasted text
+          const newLines: LyricLine[] = textLines.map((text, index) => ({
+            id: generateId(),
+            text: text.trim(),
+            textKreyol: kreyolLines[index]?.trim() || "",
+            lineNumber: index + 1,
+            isIndented: false,
+            indent: 0,
+          }))
+
+          return {
+            ...v,
+            lines: newLines,
+          }
+        }
+        return v
+      })
+    )
+  }
+
   return (
     <div className="space-y-4">
       {verses.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-          <p className="text-sm text-gray-600 mb-4">No verses added yet. Start by adding your first verse.</p>
+          <p className="text-sm text-gray-600 mb-4">No lyrics added yet. Start by adding a verse, chorus, or other section.</p>
           <Button type="button" onClick={handleAddVerse}>
             <Plus className="mr-2 h-4 w-4" />
-            Add First Verse
+            Add Section
           </Button>
         </div>
       ) : (
@@ -397,13 +498,14 @@ export function LyricsEditor({ verses, onChange, language = "FRANCAIS" }: Lyrics
                 onUpdateLine={handleUpdateLine}
                 onRemoveLine={handleRemoveLine}
                 onReorderLines={handleReorderLines}
+                onPasteLines={handlePasteLines}
               />
             ))}
           </div>
 
           <Button type="button" variant="outline" onClick={handleAddVerse} className="w-full">
             <Plus className="mr-2 h-4 w-4" />
-            Add Another Verse
+            Add Section (Verse, Chorus, Bridge, etc.)
           </Button>
         </>
       )}
@@ -411,7 +513,7 @@ export function LyricsEditor({ verses, onChange, language = "FRANCAIS" }: Lyrics
       {verses.length > 0 && (
         <div className="mt-4 text-sm text-gray-500">
           <p>
-            <strong>Tip:</strong> Drag the grip handle to reorder lines within a verse. Use the indent buttons to
+            <strong>Tip:</strong> Drag the grip handle to reorder lines within a section. Use the indent buttons to
             format your lyrics.
           </p>
         </div>

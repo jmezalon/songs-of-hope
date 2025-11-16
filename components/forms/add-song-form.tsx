@@ -4,7 +4,8 @@ import * as React from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Check } from "lucide-react"
+import { ChevronLeft, ChevronRight, Check, ChevronDown, ChevronUp } from "lucide-react"
+import { toast } from "sonner"
 import { songFormSchema, type SongFormValues, defaultValues } from "@/lib/validations/song"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,7 +14,6 @@ import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { FormField } from "@/components/ui/form-field"
-import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { LyricsEditor } from "@/components/forms/lyrics-editor"
 import { ThemeSelector } from "@/components/forms/theme-selector"
@@ -32,14 +32,10 @@ interface Section {
 }
 
 const steps = [
-  { id: 1, name: "Song Type & Basic Info", description: "Choose song type and enter basic information" },
-  { id: 2, name: "Musical Information", description: "Add musical details and metadata" },
-  { id: 3, name: "Credits & Copyright", description: "Enter attribution and copyright information" },
-  { id: 4, name: "Lyrics", description: "Add song verses and lyrics" },
-  { id: 5, name: "Themes & Categories", description: "Categorize song by themes and difficulty" },
-  { id: 6, name: "Biblical References", description: "Add scripture references" },
-  { id: 7, name: "Media (Optional)", description: "Add sheet music, audio, or video links" },
-  { id: 8, name: "Review & Submit", description: "Review and submit your song" },
+  { id: 1, name: "Basic Information", description: "Song type, title, and essential details" },
+  { id: 2, name: "Lyrics", description: "Add song verses and lyrics" },
+  { id: 3, name: "Media (Optional)", description: "Add sheet music, audio, or video links" },
+  { id: 4, name: "Review & Submit", description: "Review and submit your song" },
 ]
 
 const timeSignatures = ["2/4", "3/4", "4/4", "6/8", "9/8", "12/8"]
@@ -49,6 +45,7 @@ export function AddSongForm() {
   const [currentStep, setCurrentStep] = React.useState(1)
   const [sections, setSections] = React.useState<Section[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
+  const [showAdvanced, setShowAdvanced] = React.useState(false)
 
   const {
     register,
@@ -91,13 +88,51 @@ export function AddSongForm() {
   const onSubmit = async (data: SongFormValues) => {
     setIsLoading(true)
     try {
-      console.log("Form data:", data)
-      // TODO: Implement API call to save song
-      alert("Song form submitted! (API endpoint not yet implemented)")
-      // router.push("/admin/songs")
+      const response = await fetch("/api/songs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        // Show detailed error information
+        const errorMessage = result.error || "Failed to save song"
+        const details = result.details ? `\n\nDetails:\n${JSON.stringify(result.details, null, 2)}` : ""
+        throw new Error(errorMessage + details)
+      }
+
+      // Show success toast
+      toast.success(
+        `Song "${result.song.title}" ${data.status === "PUBLISHED" ? "published" : "saved as draft"} successfully!`,
+        {
+          description: data.status === "PUBLISHED"
+            ? "Your song is now visible to everyone"
+            : "You can continue editing before publishing",
+          duration: 4000,
+        }
+      )
+
+      // Redirect after a short delay to let user see the toast
+      setTimeout(() => {
+        router.push("/admin/songs")
+      }, 500)
     } catch (error) {
       console.error("Error submitting form:", error)
-      alert("Failed to save song. Please try again.")
+
+      // Show error toast
+      let errorMsg = "Failed to save song. Please try again."
+      if (error instanceof Error) {
+        errorMsg = error.message
+      }
+
+      toast.error("Failed to save song", {
+        description: errorMsg,
+        duration: 6000,
+      })
     } finally {
       setIsLoading(false)
     }
@@ -119,24 +154,17 @@ export function AddSongForm() {
   const getFieldsForStep = (step: number): (keyof SongFormValues)[] => {
     switch (step) {
       case 1:
-        const fields: (keyof SongFormValues)[] = ["songType", "title"]
+        // Basic Information - validate required fields
+        const fields: (keyof SongFormValues)[] = ["songType", "title", "copyrightStatus"]
         if (songType === "hymnal") {
           fields.push("sectionId", "songNumber", "language")
         }
         return fields
       case 2:
-        return [] // Musical info is optional
+        return [] // Lyrics are optional
       case 3:
-        return ["copyrightStatus"] // Copyright status is required
-      case 4:
-        return [] // Lyrics validation can be added if needed
-      case 5:
-        return [] // Themes are optional
-      case 6:
-        return [] // Biblical references are optional
-      case 7:
         return [] // Media is optional
-      case 8:
+      case 4:
         return [] // Review step
       default:
         return []
@@ -205,9 +233,9 @@ export function AddSongForm() {
             <CardDescription>{steps[currentStep - 1].description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Step 1: Song Type & Basic Info */}
+            {/* Step 1: Basic Information */}
             {currentStep === 1 && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <FormField
                   label="Song Type"
                   required
@@ -317,156 +345,6 @@ export function AddSongForm() {
                   </FormField>
                 </div>
 
-                {songType === "hymnal" && (
-                  <FormField
-                    label="Companion Song (optional)"
-                    error={errors.companionSongId?.message}
-                  >
-                    <Select {...register("companionSongId")}>
-                      <option value="">No companion song</option>
-                      {/* TODO: Populate with songs from same section */}
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Link to the companion song (same number, different language)
-                    </p>
-                  </FormField>
-                )}
-              </div>
-            )}
-
-            {/* Step 2: Musical Information */}
-            {currentStep === 2 && (
-              <div className="space-y-4">
-                <FormField
-                  label="Tune Name"
-                  error={errors.tune?.message}
-                >
-                  <Input
-                    placeholder="e.g., HYFRYDOL, AMAZING GRACE"
-                    {...register("tune")}
-                  />
-                </FormField>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    label="Meter"
-                    error={errors.meter?.message}
-                  >
-                    <Input
-                      placeholder="e.g., 8.7.8.7.D, Common Meter"
-                      {...register("meter")}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="Musical Key"
-                    error={errors.musicalKey?.message}
-                  >
-                    <Input
-                      placeholder="e.g., D Major, G minor"
-                      {...register("musicalKey")}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    label="Time Signature"
-                    error={errors.timeSignature?.message}
-                  >
-                    <Select {...register("timeSignature")}>
-                      <option value="">Select time signature...</option>
-                      {timeSignatures.map((sig) => (
-                        <option key={sig} value={sig}>
-                          {sig}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
-
-                  <FormField
-                    label="Tempo / BPM"
-                    error={errors.tempo?.message}
-                  >
-                    <Input
-                      placeholder="e.g., Moderato, 120 BPM"
-                      {...register("tempo")}
-                    />
-                  </FormField>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Credits & Copyright */}
-            {currentStep === 3 && (
-              <div className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    label="Author / Lyricist"
-                    error={errors.author?.message}
-                  >
-                    <Input
-                      placeholder="Enter author name..."
-                      {...register("author")}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="Author (Kreyòl)"
-                    error={errors.authorKreyol?.message}
-                  >
-                    <Input
-                      placeholder="Kreyòl author if different..."
-                      {...register("authorKreyol")}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    label="Composer"
-                    error={errors.composer?.message}
-                  >
-                    <Input
-                      placeholder="Enter composer name..."
-                      {...register("composer")}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="Year Written"
-                    error={errors.yearWritten?.message}
-                  >
-                    <Input
-                      type="number"
-                      placeholder="e.g., 1779"
-                      {...register("yearWritten", { valueAsNumber: true })}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    label="Translator"
-                    error={errors.translator?.message}
-                  >
-                    <Input
-                      placeholder="Enter translator name..."
-                      {...register("translator")}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="Arranger"
-                    error={errors.arranger?.message}
-                  >
-                    <Input
-                      placeholder="Enter arranger name..."
-                      {...register("arranger")}
-                    />
-                  </FormField>
-                </div>
-
                 <FormField
                   label="Copyright Status"
                   required
@@ -504,11 +382,199 @@ export function AddSongForm() {
                     </FormField>
                   </>
                 )}
+
+                {/* Advanced Settings Toggle */}
+                <div className="border-t pt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full justify-between"
+                  >
+                    <span className="font-medium">Advanced Settings (Optional)</span>
+                    {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+
+                  {showAdvanced && (
+                    <div className="mt-6 space-y-6 p-4 bg-muted/30 rounded-lg">
+                      {/* Musical Information */}
+                      <div className="space-y-4">
+                        <h3 className="font-semibold text-sm">Musical Information</h3>
+                        <FormField
+                          label="Tune Name"
+                          error={errors.tune?.message}
+                        >
+                          <Input
+                            placeholder="e.g., HYFRYDOL, AMAZING GRACE"
+                            {...register("tune")}
+                          />
+                        </FormField>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <FormField
+                            label="Meter"
+                            error={errors.meter?.message}
+                          >
+                            <Input
+                              placeholder="e.g., 8.7.8.7.D"
+                              {...register("meter")}
+                            />
+                          </FormField>
+
+                          <FormField
+                            label="Musical Key"
+                            error={errors.musicalKey?.message}
+                          >
+                            <Input
+                              placeholder="e.g., D Major"
+                              {...register("musicalKey")}
+                            />
+                          </FormField>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <FormField
+                            label="Time Signature"
+                            error={errors.timeSignature?.message}
+                          >
+                            <Select {...register("timeSignature")}>
+                              <option value="">Select time signature...</option>
+                              {timeSignatures.map((sig) => (
+                                <option key={sig} value={sig}>
+                                  {sig}
+                                </option>
+                              ))}
+                            </Select>
+                          </FormField>
+
+                          <FormField
+                            label="Tempo / BPM"
+                            error={errors.tempo?.message}
+                          >
+                            <Input
+                              placeholder="e.g., Moderato, 120 BPM"
+                              {...register("tempo")}
+                            />
+                          </FormField>
+                        </div>
+                      </div>
+
+                      {/* Credits */}
+                      <div className="space-y-4 border-t pt-4">
+                        <h3 className="font-semibold text-sm">Credits & Attribution</h3>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <FormField
+                            label="Author / Lyricist"
+                            error={errors.author?.message}
+                          >
+                            <Input
+                              placeholder="Enter author name..."
+                              {...register("author")}
+                            />
+                          </FormField>
+
+                          <FormField
+                            label="Composer"
+                            error={errors.composer?.message}
+                          >
+                            <Input
+                              placeholder="Enter composer name..."
+                              {...register("composer")}
+                            />
+                          </FormField>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <FormField
+                            label="Translator"
+                            error={errors.translator?.message}
+                          >
+                            <Input
+                              placeholder="Enter translator name..."
+                              {...register("translator")}
+                            />
+                          </FormField>
+
+                          <FormField
+                            label="Arranger"
+                            error={errors.arranger?.message}
+                          >
+                            <Input
+                              placeholder="Enter arranger name..."
+                              {...register("arranger")}
+                            />
+                          </FormField>
+                        </div>
+
+                        <FormField
+                          label="Year Written"
+                          error={errors.yearWritten?.message}
+                        >
+                          <Input
+                            type="number"
+                            placeholder="e.g., 1779"
+                            {...register("yearWritten", { valueAsNumber: true })}
+                          />
+                        </FormField>
+                      </div>
+
+                      {/* Themes */}
+                      <div className="space-y-4 border-t pt-4">
+                        <h3 className="font-semibold text-sm">Themes & Categories</h3>
+                        <ThemeSelector
+                          selectedIds={themeIds || []}
+                          onChange={(ids) => setValue("themeIds", ids)}
+                        />
+
+                        <FormField
+                          label="Difficulty Level"
+                          error={errors.difficulty?.message}
+                        >
+                          <Select
+                            value={difficulty || ""}
+                            onChange={(e) => setValue("difficulty", e.target.value as any)}
+                          >
+                            <option value="">Select difficulty...</option>
+                            <option value="EASY">Easy - Simple melody</option>
+                            <option value="MODERATE">Moderate - Some complexity</option>
+                            <option value="HARD">Hard - Complex harmonies</option>
+                          </Select>
+                        </FormField>
+                      </div>
+
+                      {/* Biblical References */}
+                      <div className="space-y-4 border-t pt-4">
+                        <h3 className="font-semibold text-sm">Biblical References</h3>
+                        <BiblicalReferences
+                          references={biblicalReferences || []}
+                          onChange={(refs) => setValue("biblicalReferences", refs)}
+                        />
+                      </div>
+
+                      {songType === "hymnal" && (
+                        <div className="border-t pt-4">
+                          <FormField
+                            label="Companion Song"
+                            error={errors.companionSongId?.message}
+                          >
+                            <Select {...register("companionSongId")}>
+                              <option value="">No companion song</option>
+                              {/* TODO: Populate with songs from same section */}
+                            </Select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Link to the companion song (same number, different language)
+                            </p>
+                          </FormField>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Step 4: Lyrics */}
-            {currentStep === 4 && (
+            {/* Step 2: Lyrics */}
+            {currentStep === 2 && (
               <div className="space-y-4">
                 <LyricsEditor
                   verses={verses || []}
@@ -518,42 +584,8 @@ export function AddSongForm() {
               </div>
             )}
 
-            {/* Step 5: Themes & Categories */}
-            {currentStep === 5 && (
-              <div className="space-y-6">
-                <ThemeSelector
-                  selectedIds={themeIds || []}
-                  onChange={(ids) => setValue("themeIds", ids)}
-                />
-
-                <div className="space-y-2">
-                  <Label htmlFor="difficulty">Difficulty Level (Optional)</Label>
-                  <Select
-                    id="difficulty"
-                    value={difficulty || ""}
-                    onChange={(e) => setValue("difficulty", e.target.value as any)}
-                  >
-                    <option value="">Select difficulty...</option>
-                    <option value="EASY">Easy - Simple melody, easy to learn</option>
-                    <option value="MODERATE">Moderate - Some musical complexity</option>
-                    <option value="HARD">Hard - Complex harmonies or rhythms</option>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {/* Step 6: Biblical References */}
-            {currentStep === 6 && (
-              <div className="space-y-4">
-                <BiblicalReferences
-                  references={biblicalReferences || []}
-                  onChange={(refs) => setValue("biblicalReferences", refs)}
-                />
-              </div>
-            )}
-
-            {/* Step 7: Media */}
-            {currentStep === 7 && (
+            {/* Step 3: Media */}
+            {currentStep === 3 && (
               <div className="space-y-4">
                 <MediaManager
                   media={media || []}
@@ -562,8 +594,8 @@ export function AddSongForm() {
               </div>
             )}
 
-            {/* Step 8: Review & Submit */}
-            {currentStep === 8 && (
+            {/* Step 4: Review & Submit */}
+            {currentStep === 4 && (
               <div className="space-y-4">
                 <SongReview
                   data={watch()}
