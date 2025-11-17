@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   Plus,
   Search,
@@ -46,6 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { toast } from "sonner"
+import { SearchBar } from "@/components/search/search-bar"
 
 // Types
 interface Song {
@@ -78,6 +80,7 @@ interface SongsResponse {
 }
 
 export default function SongsPage() {
+  const router = useRouter()
   const [data, setData] = React.useState<Song[]>([])
   const [loading, setLoading] = React.useState(true)
   const [pagination, setPagination] = React.useState({
@@ -574,18 +577,18 @@ export default function SongsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Search and Filters */}
+          {/* Search Bar with Autocomplete */}
+          <SearchBar
+            onSelect={(songId) => router.push(`/admin/songs/${songId}/edit`)}
+            placeholder="Search songs by title, lyrics, author, or number..."
+            adminMode={true}
+            className="w-full"
+          />
+
+          {/* Additional Filters */}
           {showFilters && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search songs..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
+            <div className="grid gap-4 md:grid-cols-3">
+
 
               <select
                 value={statusFilter}

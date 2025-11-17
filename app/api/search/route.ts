@@ -5,9 +5,18 @@ import { z } from "zod"
 // Validation schema for search request
 const searchSchema = z.object({
   query: z.string().min(1, "Search query is required"),
-  limit: z.number().int().min(1).max(100).optional().default(20),
-  includeVerses: z.boolean().optional().default(false),
+  limit: z.number().int().min(1).max(100).optional().default(10),
+  includeVerses: z.boolean().optional().default(true),
+  adminMode: z.boolean().optional().default(false), // Search all statuses in admin
 })
+
+interface MatchContext {
+  type: "title" | "lyrics" | "author" | "composer" | "number"
+  text: string
+  verseType?: string
+  verseLabel?: string
+  lineNumber?: number
+}
 
 interface SearchResult {
   id: string
@@ -19,6 +28,7 @@ interface SearchResult {
   firstLine: string | null
   firstLineKreyol: string | null
   language: string
+  status: string
   collection: {
     name: string
   }
@@ -27,24 +37,31 @@ interface SearchResult {
   } | null
   relevanceScore: number
   matchedFields: string[]
+  matchContext: MatchContext[] // Where the match was found
+  similarity?: number // Trigram similarity score
 }
 
 /**
- * Calculate relevance score based on where the match was found
+ * Calculate relevance score and match context based on where the match was found
  */
 function calculateRelevance(
   song: any,
   query: string,
   verses?: any[]
-): { score: number; matchedFields: string[] } {
+): { score: number; matchedFields: string[]; matchContext: MatchContext[] } {
   const lowerQuery = query.toLowerCase()
   let score = 0
   const matchedFields: string[] = []
+  const matchContext: MatchContext[] = []
 
   // Title matches (highest priority)
   if (song.title?.toLowerCase().includes(lowerQuery)) {
     score += 100
     matchedFields.push("title")
+    matchContext.push({
+      type: "title",
+      text: song.title,
+    })
     // Exact match bonus
     if (song.title.toLowerCase() === lowerQuery) {
       score += 50
@@ -54,28 +71,54 @@ function calculateRelevance(
   if (song.titleKreyol?.toLowerCase().includes(lowerQuery)) {
     score += 100
     matchedFields.push("titleKreyol")
+    matchContext.push({
+      type: "title",
+      text: song.titleKreyol,
+    })
   }
 
   // First line matches (high priority)
   if (song.firstLine?.toLowerCase().includes(lowerQuery)) {
     score += 80
     matchedFields.push("firstLine")
+    if (!matchContext.some(c => c.type === "lyrics" && c.text === song.firstLine)) {
+      matchContext.push({
+        type: "lyrics",
+        text: song.firstLine,
+        verseLabel: "First line",
+      })
+    }
   }
 
   if (song.firstLineKreyol?.toLowerCase().includes(lowerQuery)) {
     score += 80
     matchedFields.push("firstLineKreyol")
+    if (!matchContext.some(c => c.type === "lyrics" && c.text === song.firstLineKreyol)) {
+      matchContext.push({
+        type: "lyrics",
+        text: song.firstLineKreyol,
+        verseLabel: "First line (Kreyòl)",
+      })
+    }
   }
 
   // Author/Composer matches (medium priority)
   if (song.author?.toLowerCase().includes(lowerQuery)) {
     score += 50
     matchedFields.push("author")
+    matchContext.push({
+      type: "author",
+      text: song.author,
+    })
   }
 
   if (song.composer?.toLowerCase().includes(lowerQuery)) {
     score += 50
     matchedFields.push("composer")
+    matchContext.push({
+      type: "composer",
+      text: song.composer,
+    })
   }
 
   // Song number match (exact match only, medium priority)
@@ -83,23 +126,35 @@ function calculateRelevance(
   if (!isNaN(queryNumber) && song.songNumber === queryNumber) {
     score += 60
     matchedFields.push("songNumber")
+    matchContext.push({
+      type: "number",
+      text: `#${song.songNumber}`,
+    })
   }
 
   // Verse content matches (lower priority)
   if (verses && verses.length > 0) {
+    let lyricsContextAdded = 0
     for (const verse of verses) {
       if (verse.lines && verse.lines.length > 0) {
         for (const line of verse.lines) {
-          if (line.text?.toLowerCase().includes(lowerQuery)) {
+          if (line.text?.toLowerCase().includes(lowerQuery) || line.textKreyol?.toLowerCase().includes(lowerQuery)) {
             score += 20
             if (!matchedFields.includes("lyrics")) {
               matchedFields.push("lyrics")
             }
-          }
-          if (line.textKreyol?.toLowerCase().includes(lowerQuery)) {
-            score += 20
-            if (!matchedFields.includes("lyricsKreyol")) {
-              matchedFields.push("lyricsKreyol")
+
+            // Only add first 3 matching lyrics to context
+            if (lyricsContextAdded < 3) {
+              const matchedText = line.text?.toLowerCase().includes(lowerQuery) ? line.text : line.textKreyol
+              matchContext.push({
+                type: "lyrics",
+                text: matchedText || "",
+                verseType: verse.type,
+                verseLabel: verse.label || `${verse.type} ${verse.verseNumber || ""}`.trim(),
+                lineNumber: line.lineNumber,
+              })
+              lyricsContextAdded++
             }
           }
         }
@@ -110,7 +165,7 @@ function calculateRelevance(
   // Popularity bonus (small boost)
   score += Math.min(song.viewCount / 100, 10)
 
-  return { score, matchedFields }
+  return { score, matchedFields, matchContext }
 }
 
 // POST /api/search - Search songs by title, lyrics, author
@@ -119,31 +174,35 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Validate the request body
-    const { query, limit, includeVerses } = searchSchema.parse(body)
+    const { query, limit, includeVerses, adminMode } = searchSchema.parse(body)
 
     const lowerQuery = query.toLowerCase()
 
-    // Build where clause for database query
-    const where: any = {
-      AND: [
-        { status: "PUBLISHED" }, // Only search published songs
-        {
-          OR: [
-            { title: { contains: query, mode: "insensitive" } },
-            { titleKreyol: { contains: query, mode: "insensitive" } },
-            { firstLine: { contains: query, mode: "insensitive" } },
-            { firstLineKreyol: { contains: query, mode: "insensitive" } },
-            { author: { contains: query, mode: "insensitive" } },
-            { composer: { contains: query, mode: "insensitive" } },
-          ],
-        },
-      ],
-    }
+    // Build OR conditions for search
+    const orConditions: any[] = [
+      { title: { contains: query, mode: "insensitive" } },
+      { titleKreyol: { contains: query, mode: "insensitive" } },
+      { firstLine: { contains: query, mode: "insensitive" } },
+      { firstLineKreyol: { contains: query, mode: "insensitive" } },
+      { author: { contains: query, mode: "insensitive" } },
+      { composer: { contains: query, mode: "insensitive" } },
+    ]
 
     // Add song number search if query is a number
     const queryNumber = parseInt(query)
     if (!isNaN(queryNumber)) {
-      where.AND[1].OR.push({ songNumber: queryNumber })
+      orConditions.push({ songNumber: queryNumber })
+    }
+
+    // Build where clause for database query
+    const where: any = {
+      AND: [
+        // In admin mode, search all songs; otherwise only published
+        ...(adminMode ? [] : [{ status: "PUBLISHED" }]),
+        {
+          OR: orConditions,
+        },
+      ],
     }
 
     // Fetch matching songs
@@ -180,7 +239,7 @@ export async function POST(request: NextRequest) {
     if (includeVerses && songs.length === 0) {
       const songsWithMatchingVerses = await prisma.song.findMany({
         where: {
-          status: "PUBLISHED",
+          ...(adminMode ? {} : { status: "PUBLISHED" }),
           verses: {
             some: {
               lines: {
@@ -224,7 +283,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate relevance scores and rank results
     const rankedResults: SearchResult[] = songs.map((song) => {
-      const { score, matchedFields } = calculateRelevance(
+      const { score, matchedFields, matchContext } = calculateRelevance(
         song,
         query,
         includeVerses ? song.verses : undefined
@@ -240,6 +299,7 @@ export async function POST(request: NextRequest) {
         firstLine: song.firstLine,
         firstLineKreyol: song.firstLineKreyol,
         language: song.language,
+        status: song.status,
         collection: {
           name: song.collection.name,
         },
@@ -250,6 +310,7 @@ export async function POST(request: NextRequest) {
           : null,
         relevanceScore: score,
         matchedFields,
+        matchContext,
       }
     })
 
