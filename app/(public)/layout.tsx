@@ -6,6 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Music, Search, BookOpen, Heart, List, LogIn, User, LogOut } from "lucide-react";
 import { toast } from "sonner";
+import { MobileMenu } from "@/components/navigation/mobile-menu";
 
 export default function PublicLayout({
   children,
@@ -71,6 +72,9 @@ export default function PublicLayout({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Mobile Menu - Only visible on mobile */}
+            <MobileMenu isAuthenticated={!!user} />
+
             {user ? (
               <>
                 {(user.role === "ADMIN" || user.role === "CONTRIBUTOR") && (

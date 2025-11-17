@@ -151,7 +151,7 @@ export default async function SongPage({ params }: SongPageProps) {
   const isFavorite = await checkFavorite(song.id, user?.id);
 
   return (
-    <div className="container py-8">
+    <div className="container py-8 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto">
         {/* Song Actions Bar */}
         <SongActions
