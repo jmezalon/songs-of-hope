@@ -30,6 +30,8 @@ import {
   type SortingState,
   type VisibilityState,
   type RowSelectionState,
+  type Table as ReactTable,
+  type Row,
 } from "@tanstack/react-table"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -405,14 +407,14 @@ export default function SongsPage() {
       ? [
           {
             id: "select",
-            header: ({ table }) => (
+            header: ({ table }: { table: ReactTable<Song> }) => (
               <Checkbox
                 checked={table.getIsAllPageRowsSelected()}
                 onChange={(e) => table.toggleAllPageRowsSelected(!!e.target.checked)}
                 aria-label="Select all"
               />
             ),
-            cell: ({ row }) => (
+            cell: ({ row }: { row: Row<Song> }) => (
               <Checkbox
                 checked={row.getIsSelected()}
                 onChange={(e) => row.toggleSelected(!!e.target.checked)}
@@ -427,7 +429,7 @@ export default function SongsPage() {
     {
       accessorKey: "songNumber",
       header: "#",
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Song> }) => {
         const number = row.getValue("songNumber") as number | null
         return number ? <span className="font-mono">{number}</span> : <span className="text-muted-foreground">—</span>
       },
@@ -435,7 +437,7 @@ export default function SongsPage() {
     {
       accessorKey: "title",
       header: "Title",
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Song> }) => {
         const title = row.getValue("title") as string
         const titleKreyol = row.original.titleKreyol
         return (
@@ -450,7 +452,7 @@ export default function SongsPage() {
       id: "collection",
       accessorFn: (row) => row.collection.name,
       header: "Collection",
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Song> }) => {
         return <span className="text-sm">{row.original.collection.name}</span>
       },
     },
@@ -458,7 +460,7 @@ export default function SongsPage() {
       id: "section",
       accessorFn: (row) => row.section?.name,
       header: "Section",
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Song> }) => {
         const section = row.original.section
         return section ? (
           <span className="text-sm">{section.name}</span>
@@ -470,7 +472,7 @@ export default function SongsPage() {
     {
       accessorKey: "language",
       header: "Language",
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Song> }) => {
         const language = row.getValue("language") as string
         const variant = language === "BILINGUAL" ? "default" : language === "FRANCAIS" ? "secondary" : "outline"
         return <Badge variant={variant}>{language}</Badge>
@@ -479,7 +481,7 @@ export default function SongsPage() {
     {
       accessorKey: "author",
       header: "Author",
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Song> }) => {
         const author = row.getValue("author") as string | null
         return author ? <span className="text-sm">{author}</span> : <span className="text-muted-foreground">—</span>
       },
@@ -487,7 +489,7 @@ export default function SongsPage() {
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Song> }) => {
         const status = row.getValue("status") as string
         const variant =
           status === "PUBLISHED" ? "default" : status === "DRAFT" ? "secondary" : "outline"
@@ -509,7 +511,7 @@ export default function SongsPage() {
     {
       accessorKey: "viewCount",
       header: "Views",
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<Song> }) => {
         const views = row.getValue("viewCount") as number
         return <span className="font-mono text-sm">{views.toLocaleString()}</span>
       },
@@ -518,7 +520,7 @@ export default function SongsPage() {
       ? [
           {
             id: "actions",
-            cell: ({ row }) => {
+            cell: ({ row }: { row: Row<Song> }) => {
               const song = row.original
               return (
                 <div className="flex items-center gap-1">

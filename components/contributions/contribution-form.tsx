@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ContributionType } from "@prisma/client"
 import { AddSongForm } from "@/components/forms/add-song-form"
+import type { SongFormValues } from "@/lib/validations/song"
 
 interface ContributionFormData {
-  [key: string]: string | number | boolean | null | undefined
+  [key: string]: string | number | null | undefined
 }
 
 interface ContributionFormProps {
@@ -52,9 +53,10 @@ export function ContributionForm({
 
   if (type === "NEW_SONG") {
     const isEditingContribution = Boolean(contributionId)
+    const songInitialData = initialData as SongFormValues | undefined
     return (
       <AddSongForm
-        initialData={initialData}
+        initialData={songInitialData}
         mode="contribution"
         isEdit={isEditingContribution}
         contributionId={contributionId}
@@ -112,61 +114,6 @@ export function ContributionForm({
 
   const renderFormFields = () => {
     switch (type) {
-      case "NEW_SONG":
-        return (
-          <>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Song Title</label>
-              <Input
-                value={formData.title || ""}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Enter song title"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Title (Kreyòl)</label>
-              <Input
-                value={formData.titleKreyol || ""}
-                onChange={(e) => setFormData({ ...formData, titleKreyol: e.target.value })}
-                placeholder="Enter Kreyòl title (optional)"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Lyrics</label>
-              <Textarea
-                value={formData.lyrics || ""}
-                onChange={(e) => setFormData({ ...formData, lyrics: e.target.value })}
-                placeholder="Enter song lyrics"
-                rows={10}
-                required
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Author</label>
-                <Input
-                  value={formData.author || ""}
-                  onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                  placeholder="Lyricist name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Composer</label>
-                <Input
-                  value={formData.composer || ""}
-                  onChange={(e) => setFormData({ ...formData, composer: e.target.value })}
-                  placeholder="Music composer name"
-                />
-              </div>
-            </div>
-          </>
-        )
-
       case "CORRECTION":
         return (
           <>
@@ -322,8 +269,6 @@ export function ContributionForm({
 
   const getTitle = () => {
     switch (type) {
-      case "NEW_SONG":
-        return "Submit New Song"
       case "CORRECTION":
         return "Submit Correction"
       case "TRANSLATION":

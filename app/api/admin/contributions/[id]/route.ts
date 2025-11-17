@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withAuth } from "@/lib/authorization"
-import { ContributionStatus, ContributionType, type Contribution } from "@prisma/client"
+import { ContributionStatus, ContributionType, type Contribution, type Prisma } from "@prisma/client"
 import { songFormSchema, type SongFormValues } from "@/lib/validations/song"
 import { createSongWithRelations, SongServiceError } from "@/lib/services/song-service"
 import { z } from "zod"
@@ -121,7 +121,7 @@ export async function PATCH(
       const updatedContribution = await prisma.contribution.update({
         where: { id },
         data: {
-          data: normalizedData as Record<string, unknown>,
+          data: normalizedData as Prisma.InputJsonValue,
           notes: notes ?? contribution.notes,
           status: ContributionStatus.PENDING,
           reviewNotes: null,
@@ -316,7 +316,7 @@ export async function DELETE(
 async function handleApproval(
   contribution: Contribution & { song: { id: string } | null }
 ): Promise<{ songId?: string }> {
-  const contributionData = contribution.data as Record<string, unknown>
+      const contributionData = contribution.data as Record<string, unknown>
 
   switch (contribution.type) {
     case ContributionType.NEW_SONG: {
@@ -363,9 +363,10 @@ async function handleApproval(
     case ContributionType.MEDIA:
       // Handle media contribution
       if (contribution.songId && contributionData.media) {
+        const mediaPayload = contributionData.media as Prisma.MediaUncheckedCreateInput
         await prisma.media.create({
           data: {
-            ...(contributionData.media as Record<string, unknown>),
+            ...mediaPayload,
             songId: contribution.songId,
             uploadedBy: contribution.userId,
           },

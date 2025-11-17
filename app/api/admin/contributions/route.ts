@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withAuth } from "@/lib/authorization"
-import { ContributionStatus, ContributionType } from "@prisma/client"
+import { ContributionStatus, ContributionType, type Prisma } from "@prisma/client"
 import { songFormSchema, type SongFormValues } from "@/lib/validations/song"
 import { z } from "zod"
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           songId,
           type,
-          data: normalizedData as Record<string, unknown>,
+          data: normalizedData as Prisma.InputJsonValue,
           notes,
           status: ContributionStatus.PENDING,
         },

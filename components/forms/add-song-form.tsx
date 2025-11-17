@@ -32,7 +32,7 @@ interface Section {
 }
 
 interface AddSongFormProps {
-  initialData?: unknown
+  initialData?: ApiSong | SongFormValues
   isEdit?: boolean
   mode?: "direct" | "contribution"
   contributionId?: string
@@ -53,8 +53,11 @@ const timeSignatures = ["2/4", "3/4", "4/4", "6/8", "9/8", "12/8"]
 type ApiSong = {
   id: string
   sectionId: string | null
+  section?: {
+    id: string
+  } | null
   songNumber: number | null
-  language: string
+  language: SongFormValues["language"]
   title: string
   titleKreyol?: string | null
   subtitle?: string | null
@@ -71,14 +74,14 @@ type ApiSong = {
   translator?: string | null
   arranger?: string | null
   yearWritten?: number | null
-  copyrightStatus?: string | null
+  copyrightStatus?: SongFormValues["copyrightStatus"] | null
   copyrightInfo?: string | null
-  difficulty?: string | null
+  difficulty?: SongFormValues["difficulty"] | null
   firstLine?: string | null
   firstLineKreyol?: string | null
   summary?: string | null
   notes?: string | null
-  status?: string | null
+  status?: SongFormValues["status"] | null
   verses?: {
     id: string
     type: string
@@ -187,6 +190,10 @@ function transformSongToFormData(song: ApiSong | SongFormValues | null | undefin
     notes: song.notes || undefined,
     status: song.status || "DRAFT",
   }
+}
+
+function hasSongId(song?: ApiSong | SongFormValues): song is ApiSong {
+  return !!song && "id" in song
 }
 
 export function AddSongForm({
@@ -314,7 +321,8 @@ export function AddSongForm({
       // Use status override if provided
       const submitData = statusOverride ? { ...data, status: statusOverride } : data
 
-      const url = isEdit && initialData ? `/api/songs/${initialData.id}` : "/api/songs"
+      const songIdForEdit = hasSongId(initialData) ? initialData.id : undefined
+      const url = isEdit && songIdForEdit ? `/api/songs/${songIdForEdit}` : "/api/songs"
       const method = isEdit ? "PUT" : "POST"
 
       const response = await fetch(url, {

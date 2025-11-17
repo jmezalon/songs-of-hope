@@ -81,7 +81,7 @@ export default function EditContributionPage() {
       <ContributionForm
         type={contribution.type}
         songId={contribution.songId ?? undefined}
-        initialData={contribution.data as Record<string, string | number | boolean | null | undefined>}
+        initialData={contribution.data as Record<string, string | number | null | undefined>}
         initialNotes={contribution.notes ?? undefined}
         contributionId={contribution.id}
         onSuccess={() => router.push("/admin/contributions/my")}
@@ -89,4 +89,3 @@ export default function EditContributionPage() {
     </div>
   )
 }
-
