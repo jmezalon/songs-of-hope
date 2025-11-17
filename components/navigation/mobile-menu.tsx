@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Menu, Search, BookOpen, Heart, List } from "lucide-react";
+import { Menu, X, Search, BookOpen, Heart, List } from "lucide-react";
 
 interface MobileMenuProps {
   isAuthenticated: boolean;
@@ -38,7 +38,11 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
         aria-label="Toggle menu"
         aria-expanded={isOpen}
       >
-        <Menu className={`h-6 w-6 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
+        {isOpen ? (
+          <X className="h-6 w-6 transition-transform duration-200" />
+        ) : (
+          <Menu className="h-6 w-6 transition-transform duration-200" />
+        )}
       </button>
 
       {/* Dropdown Menu */}
