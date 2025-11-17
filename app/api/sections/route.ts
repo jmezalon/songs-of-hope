@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
+import { requireAdmin } from "@/lib/authorization"
 
 // Validation schema for creating a section
 const createSectionSchema = z.object({
@@ -67,6 +68,14 @@ export async function GET(request: NextRequest) {
 // POST /api/sections - Create new section (admin only)
 export async function POST(request: NextRequest) {
   try {
+    const admin = await requireAdmin().catch(() => null)
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized. Admin access required." },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
 
     // Validate the request body

@@ -347,7 +347,7 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
-            <Link href="/admin/users" className={cn(buttonVariants({ variant: "outline" }), "mt-4 w-full")}>
+            <Link href="/admin/contributions" className={cn(buttonVariants({ variant: "outline" }), "mt-4 w-full")}>
               Review Contributions
             </Link>
           </CardContent>

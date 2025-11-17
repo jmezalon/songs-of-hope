@@ -1,18 +1,16 @@
-"use client"
+ "use client"
 
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Plus,
-  Search,
   Filter,
   Download,
   Trash2,
   Eye,
   Edit,
   Copy,
-  MoreHorizontal,
   CheckCircle2,
   Circle,
   ChevronLeft,
@@ -34,7 +32,6 @@ import {
   type RowSelectionState,
 } from "@tanstack/react-table"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -49,6 +46,7 @@ import {
 import { toast } from "sonner"
 import { SearchBar } from "@/components/search/search-bar"
 import { SongTableSkeleton } from "@/components/ui/table-skeleton"
+import { useSession } from "next-auth/react"
 
 // Types
 interface Song {
@@ -82,6 +80,9 @@ interface SongsResponse {
 
 export default function SongsPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
+  const canManageSongs = session?.user.role === "ADMIN"
+  const canViewSongs = session?.user.role === "ADMIN" || session?.user.role === "CONTRIBUTOR"
   const [data, setData] = React.useState<Song[]>([])
   const [loading, setLoading] = React.useState(true)
   const [pagination, setPagination] = React.useState({
@@ -92,8 +93,6 @@ export default function SongsPage() {
   })
 
   // Filters
-  const [searchQuery, setSearchQuery] = React.useState("")
-  const [collectionFilter, setCollectionFilter] = React.useState("")
   const [sectionFilter, setSectionFilter] = React.useState("")
   const [languageFilter, setLanguageFilter] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("")
@@ -133,11 +132,24 @@ export default function SongsPage() {
   }, [pagination.page, pagination.limit, statusFilter, sectionFilter, languageFilter])
 
   React.useEffect(() => {
+    if (status === "loading") return
+
+    if (!session) {
+      router.replace("/login")
+      return
+    }
+
+    if (!canViewSongs) {
+      router.replace("/admin/contributions/new")
+      return
+    }
+
     fetchSongs()
-  }, [fetchSongs])
+  }, [fetchSongs, router, session, status, canViewSongs])
 
   // Bulk actions
   const handleBulkPublish = async () => {
+    if (!canManageSongs) return
     const selectedIds = Object.keys(rowSelection)
     if (selectedIds.length === 0) {
       toast.error("No songs selected")
@@ -164,6 +176,7 @@ export default function SongsPage() {
   }
 
   const handleBulkDelete = async () => {
+    if (!canManageSongs) return
     const selectedIds = Object.keys(rowSelection)
     if (selectedIds.length === 0) {
       toast.error("No songs selected")
@@ -230,6 +243,7 @@ export default function SongsPage() {
 
   // Quick actions
   const handleToggleStatus = async (songId: string, currentStatus: string) => {
+    if (!canManageSongs) return
     const newStatus = currentStatus === "PUBLISHED" ? "DRAFT" : "PUBLISHED"
 
     try {
@@ -260,6 +274,7 @@ export default function SongsPage() {
   }
 
   const handleDuplicate = async (songId: string) => {
+    if (!canManageSongs) return
     try {
       // Fetch the full song data
       const response = await fetch(`/api/songs/${songId}`)
@@ -364,6 +379,7 @@ export default function SongsPage() {
   }
 
   const handleDelete = async (songId: string) => {
+    if (!canManageSongs) return
     if (!confirm("Are you sure you want to delete this song?")) {
       return
     }
@@ -385,25 +401,29 @@ export default function SongsPage() {
 
   // Column definitions
   const columns: ColumnDef<Song>[] = [
-    {
-      id: "select",
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onChange={(e) => table.toggleAllPageRowsSelected(!!e.target.checked)}
-          aria-label="Select all"
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onChange={(e) => row.toggleSelected(!!e.target.checked)}
-          aria-label="Select row"
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
+    ...(canManageSongs
+      ? [
+          {
+            id: "select",
+            header: ({ table }) => (
+              <Checkbox
+                checked={table.getIsAllPageRowsSelected()}
+                onChange={(e) => table.toggleAllPageRowsSelected(!!e.target.checked)}
+                aria-label="Select all"
+              />
+            ),
+            cell: ({ row }) => (
+              <Checkbox
+                checked={row.getIsSelected()}
+                onChange={(e) => row.toggleSelected(!!e.target.checked)}
+                aria-label="Select row"
+              />
+            ),
+            enableSorting: false,
+            enableHiding: false,
+          },
+        ]
+      : []),
     {
       accessorKey: "songNumber",
       header: "#",
@@ -472,7 +492,13 @@ export default function SongsPage() {
         const variant =
           status === "PUBLISHED" ? "default" : status === "DRAFT" ? "secondary" : "outline"
         return (
-          <Badge variant={variant} className="cursor-pointer" onClick={() => handleToggleStatus(row.original.id, status)}>
+          <Badge
+            variant={variant}
+            className={canManageSongs ? "cursor-pointer" : ""}
+            onClick={
+              canManageSongs ? () => handleToggleStatus(row.original.id, status) : undefined
+            }
+          >
             {status === "PUBLISHED" && <CheckCircle2 className="mr-1 h-3 w-3" />}
             {status === "DRAFT" && <Circle className="mr-1 h-3 w-3" />}
             {status}
@@ -488,46 +514,50 @@ export default function SongsPage() {
         return <span className="font-mono text-sm">{views.toLocaleString()}</span>
       },
     },
-    {
-      id: "actions",
-      cell: ({ row }) => {
-        const song = row.original
-        return (
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => toast.info("Quick view coming soon...")}
-              title="Quick view"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Link href={`/admin/songs/${song.id}/edit`}>
-              <Button variant="ghost" size="sm" title="Edit">
-                <Edit className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDuplicate(song.id)}
-              title="Duplicate"
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDelete(song.id)}
-              title="Delete"
-              className="text-red-500 hover:text-red-700"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        )
-      },
-    },
+    ...(canManageSongs
+      ? [
+          {
+            id: "actions",
+            cell: ({ row }) => {
+              const song = row.original
+              return (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toast.info("Quick view coming soon...")}
+                    title="Quick view"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Link href={`/admin/songs/${song.id}/edit`}>
+                    <Button variant="ghost" size="sm" title="Edit">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDuplicate(song.id)}
+                    title="Duplicate"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(song.id)}
+                    title="Delete"
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )
+            },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({
@@ -541,6 +571,8 @@ export default function SongsPage() {
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    enableRowSelection: canManageSongs,
+    getRowId: (row) => row.id,
     state: {
       sorting,
       columnFilters,
@@ -548,6 +580,16 @@ export default function SongsPage() {
       rowSelection,
     },
   })
+
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-lg font-semibold">Loading...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -557,10 +599,12 @@ export default function SongsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Songs</h1>
           <p className="text-muted-foreground">Manage all songs in the hymnal database</p>
         </div>
-        <Link href="/admin/songs/new" className={buttonVariants()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Song
-        </Link>
+        {canManageSongs && (
+          <Link href="/admin/songs/new" className={buttonVariants()}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Song
+          </Link>
+        )}
       </div>
 
       {/* Filters and Actions */}
@@ -580,9 +624,11 @@ export default function SongsPage() {
         <CardContent className="space-y-4">
           {/* Search Bar with Autocomplete */}
           <SearchBar
-            onSelect={(songId) => router.push(`/admin/songs/${songId}/edit`)}
+            onSelect={
+              canManageSongs ? (songId) => router.push(`/admin/songs/${songId}/edit`) : undefined
+            }
             placeholder="Search songs by title, lyrics, author, or number..."
-            adminMode={true}
+            adminMode={!!canManageSongs}
             className="w-full"
           />
 
@@ -627,7 +673,7 @@ export default function SongsPage() {
           )}
 
           {/* Bulk Actions */}
-          {Object.keys(rowSelection).length > 0 && (
+          {canManageSongs && Object.keys(rowSelection).length > 0 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-lg border bg-muted/50 p-3">
               <span className="text-sm font-medium">{Object.keys(rowSelection).length} selected</span>
               <div className="flex flex-wrap gap-2 sm:ml-auto">

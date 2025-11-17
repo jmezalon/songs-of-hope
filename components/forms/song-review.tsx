@@ -10,7 +10,7 @@ import type { SongFormValues } from "@/lib/validations/song"
 
 interface SongReviewProps {
   data: SongFormValues
-  errors: Record<string, any>
+  errors: Record<string, { message?: string }>
 }
 
 export function SongReview({ data, errors }: SongReviewProps) {
