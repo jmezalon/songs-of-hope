@@ -1,4 +1,3 @@
-import * as React from "react"
 import Link from "next/link"
 import {
   Music,
@@ -20,109 +19,251 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { formatNumber, formatDate, cn } from "@/lib/utils"
+import { prisma } from "@/lib/prisma"
+import { ContributionStatus, type ContributionType } from "@prisma/client"
 
-// Mock data - will be replaced with actual database queries
-const dashboardStats = {
-  totalSongs: 1247,
-  totalCollections: 2,
-  songsByCollection: [
-    { name: "Chant d'Espérance", count: 1089, percentage: 87 },
-    { name: "Popular Christian Songs", count: 158, percentage: 13 },
-  ],
-  songsByLanguage: [
-    { name: "Français", count: 612, percentage: 49 },
-    { name: "Kreyòl", count: 477, percentage: 38 },
-    { name: "Bilingual", count: 158, percentage: 13 },
-  ],
-  recentAdditions: [
-    {
-      id: "1",
-      title: "Bon Dieu Nan Syèl La",
-      titleKreyol: "Bon Dieu Nan Syèl La",
-      section: "Mélodies Joyeuses",
-      songNumber: 145,
-      language: "Kreyòl",
-      addedAt: new Date("2024-11-14T10:30:00"),
-    },
-    {
-      id: "2",
-      title: "Gloire à Dieu dans les Cieux",
-      titleKreyol: null,
-      section: "Chant d'Espérance",
-      songNumber: 89,
-      language: "Français",
-      addedAt: new Date("2024-11-13T15:20:00"),
-    },
-    {
-      id: "3",
-      title: "Je Louerai l'Éternel",
-      titleKreyol: "M'ap Lwanje Letènèl",
-      section: "Échos des Élus",
-      songNumber: 234,
-      language: "Bilingual",
-      addedAt: new Date("2024-11-12T09:15:00"),
-    },
-  ],
-  pendingContributions: [
-    {
-      id: "1",
-      type: "New Song",
-      title: "Nou Bezwen Bondye",
-      contributor: "Jean-Baptiste",
-      submittedAt: new Date("2024-11-10T14:30:00"),
-      status: "pending",
-    },
-    {
-      id: "2",
-      type: "Correction",
-      title: "Chant d'Espérance #45 - Lyrics correction",
-      contributor: "Marie Claire",
-      submittedAt: new Date("2024-11-09T11:20:00"),
-      status: "pending",
-    },
-    {
-      id: "3",
-      type: "Translation",
-      title: "Amazing Grace - Kreyòl translation",
-      contributor: "Pierre Laurent",
-      submittedAt: new Date("2024-11-08T16:45:00"),
-      status: "needs_revision",
-    },
-  ],
-  weeklyStats: {
-    songsAdded: 12,
-    contributionsReceived: 8,
-    usersActive: 24,
-  },
+type LanguageCode = "FRANCAIS" | "KREYOL" | "BILINGUAL" | "ENGLISH" | "SPANISH"
+
+const languageLabels: Record<LanguageCode, string> = {
+  FRANCAIS: "Français",
+  KREYOL: "Kreyòl",
+  BILINGUAL: "Bilingual",
+  ENGLISH: "English",
+  SPANISH: "Spanish",
 }
 
 const getLanguageBadgeColor = (language: string) => {
-  switch (language) {
-    case "Français":
+  const normalized = language.toUpperCase()
+  switch (normalized) {
+    case "FRANÇAIS":
+    case "FRANCAIS":
       return "bg-blue-100 text-blue-700"
-    case "Kreyòl":
+    case "KREYÒL":
+    case "KREYOL":
       return "bg-green-100 text-green-700"
-    case "Bilingual":
+    case "BILINGUAL":
       return "bg-purple-100 text-purple-700"
     default:
       return "bg-gray-100 text-gray-700"
   }
 }
 
-const getContributionStatusBadge = (status: string) => {
+const getContributionStatusBadge = (status: ContributionStatus) => {
   switch (status) {
-    case "pending":
+    case ContributionStatus.PENDING:
       return <Badge variant="warning">Pending Review</Badge>
-    case "needs_revision":
+    case ContributionStatus.NEEDS_REVISION:
       return <Badge variant="outline">Needs Revision</Badge>
-    case "approved":
+    case ContributionStatus.APPROVED:
       return <Badge variant="success">Approved</Badge>
     default:
       return <Badge variant="outline">{status}</Badge>
   }
 }
 
-export default function AdminDashboard() {
+const getContributionTypeLabel = (type: ContributionType) => {
+  const labels: Record<ContributionType, string> = {
+    NEW_SONG: "New Song",
+    CORRECTION: "Correction",
+    TRANSLATION: "Translation",
+    METADATA: "Metadata",
+    MEDIA: "Media",
+  }
+  return labels[type]
+}
+
+const extractContributionTitle = (data: unknown): string | undefined => {
+  if (data && typeof data === "object" && "title" in data) {
+    const maybeTitle = (data as { title?: unknown }).title
+    if (typeof maybeTitle === "string" && maybeTitle.trim().length > 0) {
+      return maybeTitle
+    }
+  }
+  return undefined
+}
+
+const formatLanguageName = (code: string) =>
+  languageLabels[code as LanguageCode] ?? code
+
+export default async function AdminDashboard() {
+  const now = new Date()
+  const oneWeekAgo = new Date(now)
+  oneWeekAgo.setDate(now.getDate() - 7)
+
+  let dashboardStats: {
+    totalSongs: number
+    totalCollections: number
+    songsByCollection: { name: string; count: number; percentage: number }[]
+    songsByLanguage: { name: string; count: number; percentage: number }[]
+    recentAdditions: {
+      id: string
+      title: string
+      section: string
+      songNumber: number | null
+      language: string
+      addedAt: Date
+    }[]
+    pendingContributions: {
+      id: string
+      type: ContributionType
+      status: ContributionStatus
+      title: string
+      contributor: string
+      submittedAt: Date
+    }[]
+    weeklyStats: {
+      songsAdded: number
+      contributionsReceived: number
+      usersActive: number
+    }
+  }
+
+  try {
+  const [
+    totalSongs,
+    totalCollections,
+    languageCounts,
+    recentSongs,
+    pendingContributionRecords,
+    songsAddedThisWeek,
+    contributionsThisWeek,
+    activeContributors,
+    hymnalSongCount,
+  ] = await Promise.all([
+    prisma.song.count(),
+    prisma.collection.count(),
+    prisma.song.groupBy({
+      by: ["language"],
+      _count: { language: true },
+    }),
+      prisma.song.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        select: {
+          id: true,
+          title: true,
+          songNumber: true,
+          language: true,
+          createdAt: true,
+          section: { select: { name: true } },
+        },
+      }),
+      prisma.contribution.findMany({
+        where: {
+          status: {
+            in: [ContributionStatus.PENDING, ContributionStatus.NEEDS_REVISION],
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          data: true,
+          createdAt: true,
+          song: { select: { title: true, songNumber: true } },
+          user: { select: { name: true, email: true } },
+        },
+      }),
+      prisma.song.count({ where: { createdAt: { gte: oneWeekAgo } } }),
+    prisma.contribution.count({ where: { createdAt: { gte: oneWeekAgo } } }),
+    prisma.user.count({
+      where: {
+        contributions: {
+          some: { createdAt: { gte: oneWeekAgo } },
+        },
+      },
+    }),
+    prisma.song.count({
+      where: {
+        sectionId: { not: null },
+      },
+    }),
+  ])
+
+  const popularSongCount = totalSongs - hymnalSongCount
+
+  const songsByCollection = [
+    {
+      name: "Hymnal Songs",
+      count: hymnalSongCount,
+      percentage: totalSongs > 0 ? Math.round((hymnalSongCount / totalSongs) * 100) : 0,
+    },
+    {
+      name: "Popular Songs",
+      count: popularSongCount,
+      percentage: totalSongs > 0 ? Math.round((popularSongCount / totalSongs) * 100) : 0,
+    },
+  ]
+
+    const songsByLanguage = languageCounts.map((entry) => {
+      const count = entry._count.language
+      return {
+        name: formatLanguageName(entry.language),
+        count,
+        percentage: totalSongs > 0 ? Math.round((count / totalSongs) * 100) : 0,
+      }
+    })
+
+    const recentAdditions = recentSongs.map((song) => ({
+      id: song.id,
+      title: song.title,
+      section: song.section?.name || "Uncategorized",
+      songNumber: song.songNumber,
+      language: formatLanguageName(song.language),
+      addedAt: song.createdAt,
+    }))
+
+    const pendingContributions = pendingContributionRecords.map((contribution) => ({
+      id: contribution.id,
+      type: contribution.type,
+      status: contribution.status,
+      title:
+        contribution.song?.title ||
+        extractContributionTitle(contribution.data) ||
+        getContributionTypeLabel(contribution.type),
+      contributor:
+        contribution.user?.name || contribution.user?.email || "Contributor",
+      submittedAt: contribution.createdAt,
+    }))
+
+    dashboardStats = {
+      totalSongs,
+      totalCollections,
+      songsByCollection,
+      songsByLanguage,
+      recentAdditions,
+      pendingContributions,
+      weeklyStats: {
+        songsAdded: songsAddedThisWeek,
+        contributionsReceived: contributionsThisWeek,
+        usersActive: activeContributors,
+      },
+    }
+  } catch (error) {
+    console.error("Failed to load dashboard stats:", error)
+    dashboardStats = {
+      totalSongs: 0,
+      totalCollections: 0,
+      songsByCollection: [],
+      songsByLanguage: [],
+      recentAdditions: [],
+      pendingContributions: [],
+      weeklyStats: {
+        songsAdded: 0,
+        contributionsReceived: 0,
+        usersActive: 0,
+      },
+    }
+  }
+
+  const languagesSummary =
+    dashboardStats.songsByLanguage.map((lang) => lang.name).join(", ") ||
+    "No songs yet"
+
+  const topCollection = dashboardStats.songsByCollection[0]
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -155,12 +296,10 @@ export default function AdminDashboard() {
             <Music className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatNumber(dashboardStats.totalSongs)}
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(dashboardStats.totalSongs)}</div>
             <p className="text-xs text-muted-foreground">
               <span className="text-green-600 font-medium">
-                +{dashboardStats.weeklyStats.songsAdded}
+                +{formatNumber(dashboardStats.weeklyStats.songsAdded)}
               </span>{" "}
               this week
             </p>
@@ -173,11 +312,11 @@ export default function AdminDashboard() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {dashboardStats.totalCollections}
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(dashboardStats.totalCollections)}</div>
             <p className="text-xs text-muted-foreground">
-              {dashboardStats.songsByCollection[0].count} in Chant d&apos;Espérance
+              {topCollection
+                ? `${formatNumber(topCollection.count)} in ${topCollection.name}`
+                : "No collections yet"}
             </p>
           </CardContent>
         </Card>
@@ -188,10 +327,10 @@ export default function AdminDashboard() {
             <Languages className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
-            <p className="text-xs text-muted-foreground">
-              Français, Kreyòl, Bilingual
-            </p>
+            <div className="text-2xl font-bold">
+              {dashboardStats.songsByLanguage.length}
+            </div>
+            <p className="text-xs text-muted-foreground">{languagesSummary}</p>
           </CardContent>
         </Card>
 
@@ -204,11 +343,11 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dashboardStats.weeklyStats.usersActive}
+              {formatNumber(dashboardStats.weeklyStats.usersActive)}
             </div>
             <p className="text-xs text-muted-foreground">
               <span className="text-green-600 font-medium">
-                +{dashboardStats.weeklyStats.contributionsReceived}
+                +{formatNumber(dashboardStats.weeklyStats.contributionsReceived)}
               </span>{" "}
               contributions
             </p>
@@ -227,6 +366,9 @@ export default function AdminDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {dashboardStats.songsByCollection.length === 0 && (
+              <p className="text-sm text-muted-foreground">No songs recorded yet.</p>
+            )}
             {dashboardStats.songsByCollection.map((collection) => (
               <div key={collection.name} className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
@@ -253,6 +395,9 @@ export default function AdminDashboard() {
             <CardDescription>Language distribution</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {dashboardStats.songsByLanguage.length === 0 && (
+              <p className="text-sm text-muted-foreground">No language data yet.</p>
+            )}
             {dashboardStats.songsByLanguage.map((language) => (
               <div key={language.name} className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
@@ -283,6 +428,9 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {dashboardStats.recentAdditions.length === 0 && (
+                <p className="text-sm text-muted-foreground">No songs added yet.</p>
+              )}
               {dashboardStats.recentAdditions.map((song) => (
                 <div
                   key={song.id}
@@ -293,7 +441,7 @@ export default function AdminDashboard() {
                       {song.title}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {song.section} #{song.songNumber}
+                      {song.section} {song.songNumber ? `#${song.songNumber}` : ""}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(song.addedAt)}
@@ -308,7 +456,10 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
-            <Link href="/admin/songs" className={cn(buttonVariants({ variant: "outline" }), "mt-4 w-full")}>
+            <Link
+              href="/admin/songs"
+              className={cn(buttonVariants({ variant: "outline" }), "mt-4 w-full")}
+            >
               View All Songs
             </Link>
           </CardContent>
@@ -324,6 +475,9 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {dashboardStats.pendingContributions.length === 0 && (
+                <p className="text-sm text-muted-foreground">No pending submissions.</p>
+              )}
               {dashboardStats.pendingContributions.map((contribution) => (
                 <div
                   key={contribution.id}
@@ -332,7 +486,7 @@ export default function AdminDashboard() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="text-xs">
-                        {contribution.type}
+                        {getContributionTypeLabel(contribution.type)}
                       </Badge>
                       {getContributionStatusBadge(contribution.status)}
                     </div>
@@ -340,14 +494,16 @@ export default function AdminDashboard() {
                       {contribution.title}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      by {contribution.contributor} •{" "}
-                      {formatDate(contribution.submittedAt)}
+                      by {contribution.contributor} • {formatDate(contribution.submittedAt)}
                     </p>
                   </div>
                 </div>
               ))}
             </div>
-            <Link href="/admin/contributions" className={cn(buttonVariants({ variant: "outline" }), "mt-4 w-full")}>
+            <Link
+              href="/admin/contributions"
+              className={cn(buttonVariants({ variant: "outline" }), "mt-4 w-full")}
+            >
               Review Contributions
             </Link>
           </CardContent>
@@ -364,19 +520,31 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Link href="/admin/songs/new" className={cn(buttonVariants({ variant: "outline" }), "justify-start")}>
+            <Link
+              href="/admin/songs/new"
+              className={cn(buttonVariants({ variant: "outline" }), "justify-start")}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Add New Song
             </Link>
-            <Link href="/admin/collections" className={cn(buttonVariants({ variant: "outline" }), "justify-start")}>
+            <Link
+              href="/admin/collections"
+              className={cn(buttonVariants({ variant: "outline" }), "justify-start")}
+            >
               <BookOpen className="mr-2 h-4 w-4" />
               Manage Collections
             </Link>
-            <Link href="/admin/themes" className={cn(buttonVariants({ variant: "outline" }), "justify-start")}>
+            <Link
+              href="/admin/themes"
+              className={cn(buttonVariants({ variant: "outline" }), "justify-start")}
+            >
               <CheckCircle className="mr-2 h-4 w-4" />
               Manage Themes
             </Link>
-            <Link href="/admin/media" className={cn(buttonVariants({ variant: "outline" }), "justify-start")}>
+            <Link
+              href="/admin/media"
+              className={cn(buttonVariants({ variant: "outline" }), "justify-start")}
+            >
               <TrendingUp className="mr-2 h-4 w-4" />
               Upload Media
             </Link>
