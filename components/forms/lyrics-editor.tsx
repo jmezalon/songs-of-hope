@@ -31,7 +31,7 @@ import type { LyricLine, LyricVerse } from "@/lib/validations/song"
 interface LyricsEditorProps {
   verses: LyricVerse[]
   onChange: (verses: LyricVerse[]) => void
-  language?: "FRANCAIS" | "KREYOL" | "BILINGUAL"
+  language?: "FRANCAIS" | "KREYOL" | "BILINGUAL" | "ENGLISH" | "SPANISH"
 }
 
 const VERSE_TYPES = [
@@ -76,7 +76,7 @@ function createEmptyVerse(sortOrder: number): LyricVerse {
 interface SortableLineProps {
   line: LyricLine
   verseId: string
-  language?: "FRANCAIS" | "KREYOL" | "BILINGUAL"
+  language?: "FRANCAIS" | "KREYOL" | "BILINGUAL" | "ENGLISH" | "SPANISH"
   onUpdate: (id: string, updates: Partial<LyricLine>) => void
   onRemove: (id: string) => void
   canRemove: boolean
@@ -170,7 +170,7 @@ function SortableLine({ line, verseId, language, onUpdate, onRemove, canRemove }
 // Verse Card Component
 interface VerseCardProps {
   verse: LyricVerse
-  language?: "FRANCAIS" | "KREYOL" | "BILINGUAL"
+  language?: "FRANCAIS" | "KREYOL" | "BILINGUAL" | "ENGLISH" | "SPANISH"
   onUpdate: (id: string, updates: Partial<LyricVerse>) => void
   onRemove: (id: string) => void
   onAddLine: (verseId: string) => void

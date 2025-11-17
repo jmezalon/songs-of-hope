@@ -31,6 +31,11 @@ interface Section {
   }
 }
 
+interface AddSongFormProps {
+  initialData?: any
+  isEdit?: boolean
+}
+
 const steps = [
   { id: 1, name: "Basic Information", description: "Song type, title, and essential details" },
   { id: 2, name: "Lyrics", description: "Add song verses and lyrics" },
@@ -40,12 +45,87 @@ const steps = [
 
 const timeSignatures = ["2/4", "3/4", "4/4", "6/8", "9/8", "12/8"]
 
-export function AddSongForm() {
+// Transform API song data to form format
+function transformSongToFormData(song: any): Partial<SongFormValues> {
+  if (!song) return defaultValues
+
+  return {
+    songType: song.section ? "hymnal" : "popular",
+    sectionId: song.sectionId || undefined,
+    songNumber: song.songNumber || undefined,
+    language: song.language,
+    title: song.title,
+    titleKreyol: song.titleKreyol || undefined,
+    subtitle: song.subtitle || undefined,
+    subtitleKreyol: song.subtitleKreyol || undefined,
+    companionSongId: song.companionSongId || undefined,
+    tune: song.tune || undefined,
+    meter: song.meter || undefined,
+    musicalKey: song.musicalKey || undefined,
+    timeSignature: song.timeSignature || "4/4",
+    tempo: song.tempo || undefined,
+    author: song.author || undefined,
+    authorKreyol: song.authorKreyol || undefined,
+    composer: song.composer || undefined,
+    translator: song.translator || undefined,
+    arranger: song.arranger || undefined,
+    yearWritten: song.yearWritten || undefined,
+    copyrightStatus: song.copyrightStatus || "UNKNOWN",
+    copyrightInfo: song.copyrightInfo || undefined,
+    verses: song.verses?.map((verse: any) => ({
+      id: verse.id,
+      type: verse.type,
+      verseNumber: verse.verseNumber,
+      label: verse.label || `${verse.type} ${verse.verseNumber || ""}`.trim(),
+      labelKreyol: verse.labelKreyol,
+      sortOrder: verse.sortOrder,
+      isRepeated: verse.isRepeated,
+      lines: verse.lines?.map((line: any) => ({
+        id: line.id,
+        text: line.text,
+        textKreyol: line.textKreyol || "",
+        lineNumber: line.lineNumber,
+        isIndented: line.isIndented,
+        indent: line.indent,
+      })) || [],
+    })) || [],
+    themeIds: song.themes?.map((t: any) => t.theme.id) || [],
+    biblicalReferences: song.biblicalRefs?.map((ref: any) => ({
+      id: ref.biblicalReference.id,
+      book: ref.biblicalReference.book,
+      chapter: ref.biblicalReference.chapter,
+      verseStart: ref.biblicalReference.verseStart,
+      verseEnd: ref.biblicalReference.verseEnd,
+    })) || [],
+    media: song.media?.map((m: any) => ({
+      id: m.id,
+      type: m.type,
+      url: m.url,
+      title: m.title || undefined,
+    })) || [],
+    difficulty: song.difficulty || undefined,
+    firstLine: song.firstLine || undefined,
+    firstLineKreyol: song.firstLineKreyol || undefined,
+    summary: song.summary || undefined,
+    notes: song.notes || undefined,
+    status: song.status || "DRAFT",
+  }
+}
+
+export function AddSongForm({ initialData, isEdit = false }: AddSongFormProps = {}) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = React.useState(1)
   const [sections, setSections] = React.useState<Section[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
   const [showAdvanced, setShowAdvanced] = React.useState(false)
+
+  // Transform initial data if editing
+  const formDefaultValues = React.useMemo(() => {
+    if (isEdit && initialData) {
+      return transformSongToFormData(initialData)
+    }
+    return defaultValues
+  }, [isEdit, initialData])
 
   const {
     register,
@@ -54,11 +134,19 @@ export function AddSongForm() {
     setValue,
     formState: { errors },
     trigger,
+    reset,
   } = useForm<SongFormValues>({
     resolver: zodResolver(songFormSchema) as Resolver<SongFormValues>,
-    defaultValues,
+    defaultValues: formDefaultValues,
     mode: "onChange",
   })
+
+  // Reset form when initial data changes
+  React.useEffect(() => {
+    if (isEdit && initialData) {
+      reset(transformSongToFormData(initialData))
+    }
+  }, [isEdit, initialData, reset])
 
   const songType = watch("songType")
   const language = watch("language")
@@ -76,7 +164,7 @@ export function AddSongForm() {
         const response = await fetch("/api/sections")
         if (response.ok) {
           const data = await response.json()
-          setSections(data)
+          setSections(data.sections)
         }
       } catch (error) {
         console.error("Failed to fetch sections:", error)
@@ -85,31 +173,39 @@ export function AddSongForm() {
     fetchSections()
   }, [])
 
-  const onSubmit = async (data: SongFormValues) => {
+  const submitSong = async (data: SongFormValues, statusOverride?: "DRAFT" | "PUBLISHED") => {
     setIsLoading(true)
     try {
-      const response = await fetch("/api/songs", {
-        method: "POST",
+      // Use status override if provided
+      const submitData = statusOverride ? { ...data, status: statusOverride } : data
+
+      const url = isEdit && initialData ? `/api/songs/${initialData.id}` : "/api/songs"
+      const method = isEdit ? "PUT" : "POST"
+
+      const response = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(submitData),
       })
 
       const result = await response.json()
 
       if (!response.ok) {
         // Show detailed error information
-        const errorMessage = result.error || "Failed to save song"
+        const errorMessage = result.error || `Failed to ${isEdit ? "update" : "save"} song`
         const details = result.details ? `\n\nDetails:\n${JSON.stringify(result.details, null, 2)}` : ""
         throw new Error(errorMessage + details)
       }
 
       // Show success toast
       toast.success(
-        `Song "${result.song.title}" ${data.status === "PUBLISHED" ? "published" : "saved as draft"} successfully!`,
+        `Song "${result.song.title}" ${isEdit ? "updated" : data.status === "PUBLISHED" ? "published" : "saved"} successfully!`,
         {
-          description: data.status === "PUBLISHED"
+          description: isEdit
+            ? "Your changes have been saved"
+            : data.status === "PUBLISHED"
             ? "Your song is now visible to everyone"
             : "You can continue editing before publishing",
           duration: 4000,
@@ -124,7 +220,7 @@ export function AddSongForm() {
       console.error("Error submitting form:", error)
 
       // Show error toast
-      let errorMsg = "Failed to save song. Please try again."
+      let errorMsg = `Failed to ${isEdit ? "update" : "save"} song. Please try again.`
       if (error instanceof Error) {
         errorMsg = error.message
       }
@@ -137,6 +233,9 @@ export function AddSongForm() {
       setIsLoading(false)
     }
   }
+
+  // Wrapper for form onSubmit (without status override)
+  const onSubmit = (data: SongFormValues) => submitSong(data)
 
   const nextStep = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault()
@@ -295,11 +394,28 @@ export function AddSongForm() {
                         <Select {...register("language")}>
                           <option value="FRANCAIS">Français</option>
                           <option value="KREYOL">Kreyòl</option>
-                          <option value="BILINGUAL">Bilingual</option>
+                          <option value="BILINGUAL">Bilingual (Français/Kreyòl)</option>
                         </Select>
                       </FormField>
                     </div>
                   </>
+                )}
+
+                {songType === "popular" && (
+                  <FormField
+                    label="Language"
+                    required
+                    error={errors.language?.message}
+                  >
+                    <Select {...register("language")}>
+                      <option value="">Select language...</option>
+                      <option value="ENGLISH">English</option>
+                      <option value="SPANISH">Spanish</option>
+                      <option value="FRANCAIS">Français</option>
+                      <option value="KREYOL">Kreyòl</option>
+                      <option value="BILINGUAL">Bilingual</option>
+                    </Select>
+                  </FormField>
                 )}
 
                 <FormField
@@ -628,17 +744,33 @@ export function AddSongForm() {
             ) : (
               <>
                 <Button
-                  type="submit"
+                  type="button"
                   variant="outline"
-                  onClick={() => setValue("status", "DRAFT")}
+                  onClick={async () => {
+                    const isValid = await trigger()
+                    if (isValid) {
+                      handleSubmit((data) => submitSong(data, "DRAFT"))()
+                    } else {
+                      toast.error("Please fix the form errors before saving")
+                    }
+                  }}
                   disabled={isLoading}
+                  className="cursor-pointer"
                 >
                   Save as Draft
                 </Button>
                 <Button
-                  type="submit"
-                  onClick={() => setValue("status", "PUBLISHED")}
+                  type="button"
+                  onClick={async () => {
+                    const isValid = await trigger()
+                    if (isValid) {
+                      handleSubmit((data) => submitSong(data, "PUBLISHED"))()
+                    } else {
+                      toast.error("Please fix the form errors before publishing")
+                    }
+                  }}
                   disabled={isLoading}
+                  className="cursor-pointer"
                 >
                   {isLoading ? "Publishing..." : "Publish Song"}
                 </Button>
