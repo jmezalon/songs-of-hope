@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/ui/select"
 import { Card } from "@/components/ui/card"
+import { UserTableSkeleton } from "@/components/ui/table-skeleton"
 
 type UserRole = "ADMIN" | "CONTRIBUTOR" | "USER"
 
@@ -164,14 +165,6 @@ export default function UsersPage() {
     })
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Loading users...</p>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -182,12 +175,16 @@ export default function UsersPage() {
           </p>
         </div>
         <div className="text-sm text-muted-foreground">
-          {users.length} total users
+          {loading ? "..." : `${users.length} total users`}
         </div>
       </div>
 
-      <Card className="p-0">
-        <Table>
+      <Card className="p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          {loading ? (
+            <UserTableSkeleton rows={5} />
+          ) : (
+            <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
@@ -232,15 +229,17 @@ export default function UsersPage() {
                   {formatDate(user.lastLoginAt)}
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-1 sm:gap-2">
                     {user.isActive ? (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => updateUserStatus(user.id, false)}
                         disabled={updatingUserId === user.id}
+                        className="whitespace-nowrap"
                       >
-                        Deactivate
+                        <span className="hidden sm:inline">Deactivate</span>
+                        <span className="sm:hidden">Deact</span>
                       </Button>
                     ) : (
                       <Button
@@ -248,8 +247,10 @@ export default function UsersPage() {
                         size="sm"
                         onClick={() => updateUserStatus(user.id, true)}
                         disabled={updatingUserId === user.id}
+                        className="whitespace-nowrap"
                       >
-                        Activate
+                        <span className="hidden sm:inline">Activate</span>
+                        <span className="sm:hidden">Act</span>
                       </Button>
                     )}
                     <Button
@@ -257,17 +258,21 @@ export default function UsersPage() {
                       size="sm"
                       onClick={() => deleteUser(user.id)}
                       disabled={updatingUserId === user.id}
+                      className="whitespace-nowrap"
                     >
-                      Delete
+                      <span className="hidden sm:inline">Delete</span>
+                      <span className="sm:hidden">Del</span>
                     </Button>
                   </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+            </Table>
+          )}
+        </div>
 
-        {users.length === 0 && (
+        {!loading && users.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground">No users found</p>
           </div>
