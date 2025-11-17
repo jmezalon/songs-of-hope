@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname
 
   // Only check authentication for admin routes
@@ -32,6 +32,10 @@ export async function middleware(req: NextRequest) {
 
   return NextResponse.next()
 }
+
+// Temporary alias while migrating from middleware.ts to proxy.ts. Keeping the
+// original export ensures compatibility with any lingering imports or tooling.
+export const middleware = proxy
 
 export const config = {
   matcher: ["/admin/:path*"],

@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Music, Search, BookOpen, TrendingUp, Clock } from "lucide-react";
 import { PublicSearchBar } from "@/components/search/public-search-bar";
 
+export const dynamic = "force-dynamic";
+
 async function getFeaturedSongs() {
   const [popular, recent] = await Promise.all([
     // Get popular songs
