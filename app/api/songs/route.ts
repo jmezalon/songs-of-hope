@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof SongServiceError) {
       return NextResponse.json(
-        { error: error.message },
+        { error: error.message, existingSongId: error.existingSongId },
         { status: error.status }
       )
     }

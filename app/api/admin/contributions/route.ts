@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { withAuth } from "@/lib/authorization"
 import { ContributionStatus, ContributionType, type Prisma } from "@prisma/client"
 import { songFormSchema, type SongFormValues } from "@/lib/validations/song"
+import { findDuplicateSongId } from "@/lib/services/song-service"
 import { z } from "zod"
 
 /**
@@ -41,6 +42,16 @@ export async function POST(request: NextRequest) {
       if (type === ContributionType.NEW_SONG) {
         try {
           normalizedData = songFormSchema.parse(data as SongFormValues)
+          const duplicateId = await findDuplicateSongId(normalizedData as SongFormValues)
+          if (duplicateId) {
+            return NextResponse.json(
+              {
+                error: "A song with similar lyrics already exists.",
+                existingSongId: duplicateId,
+              },
+              { status: 409 }
+            )
+          }
         } catch (parseError) {
           if (parseError instanceof z.ZodError) {
             return NextResponse.json(

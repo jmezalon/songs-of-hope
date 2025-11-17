@@ -50,6 +50,11 @@ const navItems: NavItem[] = [
     icon: FileText,
   },
   {
+    title: "Review Contributions",
+    href: "/admin/contributions",
+    icon: Eye,
+  },
+  {
     title: "Add Song",
     href: "/admin/songs/new",
     icon: Plus,
@@ -193,10 +198,9 @@ export default function AdminLayout({
           {/* Navigation */}
           <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
             {navItems
-              // Contributors should not see admin-only tabs like Users & Contributions.
-              // We treat ADMIN as the only role that can manage users / reviews.
+              // Restrict admin-only tabs like Users & Review Contributions
               .filter((item) => {
-                if (item.href === "/admin/users") {
+                if (item.href === "/admin/users" || item.href === "/admin/contributions") {
                   return session.user.role === "ADMIN"
                 }
                 return true

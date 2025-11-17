@@ -211,6 +211,7 @@ export function AddSongForm({
   const [showAdvanced, setShowAdvanced] = React.useState(false)
   const isContributionMode = mode === "contribution"
   const [submissionNotes, setSubmissionNotes] = React.useState(defaultNotes || "")
+  const [duplicateNotice, setDuplicateNotice] = React.useState<{ id?: string; message: string } | null>(null)
 
   // Transform initial data if editing
   const formDefaultValues = React.useMemo(() => {
@@ -283,7 +284,7 @@ export function AddSongForm({
 
         const endpoint = contributionId ? `/api/admin/contributions/${contributionId}` : "/api/admin/contributions"
         const method = contributionId ? "PATCH" : "POST"
-        const body = contributionId
+        const payload = contributionId
           ? { data: submitData, notes: submissionNotes || undefined }
           : { type: "NEW_SONG", data: submitData, notes: submissionNotes || undefined }
 
@@ -292,15 +293,30 @@ export function AddSongForm({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(body),
+          body: JSON.stringify(payload),
         })
 
         const result = await response.json()
 
         if (!response.ok) {
+          if (response.status === 409 || result.existingSongId) {
+            setDuplicateNotice({
+              id: result.existingSongId,
+              message: result.error || "A similar song already exists.",
+            })
+            return
+          }
           const errorMessage = result.error || "Failed to submit contribution"
           const details = result.details ? `\n\nDetails:\n${JSON.stringify(result.details, null, 2)}` : ""
           throw new Error(errorMessage + details)
+        }
+
+        if (result.existingSongId) {
+          setDuplicateNotice({
+            id: result.existingSongId,
+            message: result.error || "A similar song already exists.",
+          })
+          return
         }
 
         toast.success(
@@ -313,8 +329,11 @@ export function AddSongForm({
           }
         )
 
-        onContributionComplete?.()
-        router.push("/admin/contributions/my")
+        if (onContributionComplete) {
+          onContributionComplete()
+        } else {
+          router.push("/admin/contributions/my")
+        }
         return
       }
 
@@ -336,7 +355,24 @@ export function AddSongForm({
       const result = await response.json()
 
       if (!response.ok) {
-        // Show detailed error information
+        if (response.status === 409) {
+          const existingId = result.songId || result.existingSongId
+          toast.error(result.error || "This song already exists.", {
+            description: existingId ? (
+              <span>
+                <a
+                  href={`/songs/${existingId}`}
+                  className="underline"
+                >
+                  View existing song
+                </a>
+              </span>
+            ) : undefined,
+            duration: 6000,
+          })
+          return
+        }
+
         const errorMessage = result.error || `Failed to ${isEdit ? "update" : "save"} song`
         const details = result.details ? `\n\nDetails:\n${JSON.stringify(result.details, null, 2)}` : ""
         throw new Error(errorMessage + details)
@@ -959,6 +995,32 @@ export function AddSongForm({
           </div>
         </div>
       </form>
+
+      {duplicateNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <Card className="w-full max-w-md p-6 space-y-4">
+            <h3 className="text-xl font-semibold">Possible Duplicate</h3>
+            <p className="text-sm text-muted-foreground">
+              {duplicateNotice.message}
+            </p>
+            <div className="flex flex-col gap-2">
+              {duplicateNotice.id && (
+                <Button
+                  onClick={() => {
+                    router.push(`/songs/${duplicateNotice.id}`)
+                    setDuplicateNotice(null)
+                  }}
+                >
+                  View existing song
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setDuplicateNotice(null)}>
+                Back to form
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

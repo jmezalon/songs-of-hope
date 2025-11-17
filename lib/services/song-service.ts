@@ -4,10 +4,12 @@ import type { Prisma, Song } from "@prisma/client"
 
 export class SongServiceError extends Error {
   status: number
+  existingSongId?: string
 
-  constructor(message: string, status = 400) {
+  constructor(message: string, status = 400, existingSongId?: string) {
     super(message)
     this.status = status
+    this.existingSongId = existingSongId
   }
 }
 
@@ -222,6 +224,15 @@ async function persistVerses(
 export async function createSongWithRelations(data: SongFormValues) {
   const collectionId = await resolveCollectionId(data)
 
+  const duplicateId = await findDuplicateSongId(data)
+  if (duplicateId) {
+    throw new SongServiceError(
+      "A song with similar lyrics already exists.",
+      409,
+      duplicateId
+    )
+  }
+
   return prisma.$transaction(async (tx) => {
     const createdSong = await tx.song.create({
       data: baseSongData(data, collectionId),
@@ -333,4 +344,110 @@ export async function ensureSongIsViewable(song: Song | null, userRole?: string)
   ) {
     throw new SongServiceError("Song not found", 404)
   }
+}
+function isDuplicateVerse(existing: SongFormValues["verses"], incoming: SongFormValues["verses"]) {
+  if (!existing?.length || !incoming?.length) return false
+
+  const normalize = (line: string) =>
+    line.trim().toLowerCase().replace(/\s+/g, " ")
+
+  const existingSequences = new Set<string>()
+
+  for (const verse of existing) {
+    for (let i = 0; i <= verse.lines.length - 3; i++) {
+      const seq = verse.lines.slice(i, i + 3).map((line) => normalize(line.text)).join("||")
+      existingSequences.add(seq)
+    }
+  }
+
+  for (const verse of incoming) {
+    for (let i = 0; i <= verse.lines.length - 3; i++) {
+      const seq = verse.lines.slice(i, i + 3).map((line) => normalize(line.text)).join("||")
+      if (existingSequences.has(seq)) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+async function findCandidateSongs(data: SongFormValues) {
+  if (!data.verses || data.verses.length === 0) {
+    return []
+  }
+
+  const snippets = data.verses
+    .flatMap((verse) =>
+      verse.lines
+        .map((line) => line.text?.slice(0, 20).trim())
+        .filter(Boolean)
+    )
+    .map((snippet) => snippet || "")
+
+  if (snippets.length === 0) {
+    return []
+  }
+
+  return prisma.song.findMany({
+    where: {
+      OR: snippets.map((snippet) => ({
+        verses: {
+          some: {
+            lines: {
+              some: {
+                text: {
+                  contains: snippet,
+                  mode: "insensitive",
+                },
+              },
+            },
+          },
+        },
+      })),
+    },
+    include: {
+      verses: {
+        include: {
+          lines: true,
+        },
+      },
+    },
+  })
+}
+
+export async function findDuplicateSongId(data: SongFormValues) {
+  if (data.songType !== "popular") {
+    return undefined
+  }
+
+  const candidates = await findCandidateSongs(data)
+
+  for (const existing of candidates) {
+    const normalized = existing.verses.map((verse) => ({
+      id: verse.id,
+      type:
+        verse.type === "CODA"
+          ? "OUTRO"
+          : (verse.type as SongFormValues["verses"][number]["type"]),
+      label: verse.label || verse.type,
+      sortOrder: verse.sortOrder || 0,
+      isRepeated: verse.isRepeated || false,
+      verseNumber: verse.verseNumber || undefined,
+      lines: verse.lines.map((line) => ({
+        id: line.id,
+        text: line.text,
+        textKreyol: line.textKreyol || undefined,
+        lineNumber: line.lineNumber,
+        isIndented: line.isIndented,
+        indent: line.indent,
+      })),
+    }))
+
+    if (isDuplicateVerse(normalized, data.verses)) {
+      return existing.id
+    }
+  }
+
+  return undefined
 }
