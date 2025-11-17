@@ -20,28 +20,9 @@ export default async function Image() {
           alignItems: 'center',
           justifyContent: 'center',
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
+          fontFamily: 'system-ui, sans-serif',
         }}
       >
-        {/* Background Pattern */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            opacity: 0.1,
-            background: `repeating-linear-gradient(
-              45deg,
-              transparent,
-              transparent 10px,
-              rgba(255,255,255,.03) 10px,
-              rgba(255,255,255,.03) 20px
-            )`,
-          }}
-        />
-
         {/* Content Container */}
         <div
           style={{
@@ -51,8 +32,6 @@ export default async function Image() {
             justifyContent: 'center',
             padding: '60px',
             textAlign: 'center',
-            position: 'relative',
-            zIndex: 1,
           }}
         >
           {/* Music Icon */}
@@ -62,12 +41,10 @@ export default async function Image() {
               height: '100px',
               borderRadius: '25px',
               background: 'rgba(255, 255, 255, 0.2)',
-              backdropFilter: 'blur(10px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: '30px',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
             }}
           >
             <svg
@@ -77,8 +54,6 @@ export default async function Image() {
               fill="none"
               stroke="white"
               strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
             >
               <path d="M9 18V5l12-2v13" />
               <circle cx="6" cy="18" r="3" />
@@ -94,7 +69,6 @@ export default async function Image() {
               color: 'white',
               margin: 0,
               marginBottom: '16px',
-              textShadow: '0 4px 20px rgba(0,0,0,0.3)',
               letterSpacing: '-0.02em',
             }}
           >
@@ -109,7 +83,6 @@ export default async function Image() {
               color: 'rgba(255, 255, 255, 0.95)',
               margin: 0,
               marginBottom: '12px',
-              textShadow: '0 2px 10px rgba(0,0,0,0.2)',
             }}
           >
             Songs of Hope • Chante Lespwa
@@ -123,8 +96,6 @@ export default async function Image() {
               color: 'rgba(255, 255, 255, 0.85)',
               margin: 0,
               maxWidth: '700px',
-              lineHeight: 1.5,
-              textShadow: '0 2px 8px rgba(0,0,0,0.2)',
             }}
           >
             Digital Haitian Adventist Hymnal • Français & Kreyòl
@@ -142,11 +113,9 @@ export default async function Image() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
                 padding: '10px 20px',
                 background: 'rgba(255, 255, 255, 0.2)',
                 borderRadius: '100px',
-                backdropFilter: 'blur(10px)',
               }}
             >
               <span
@@ -163,11 +132,9 @@ export default async function Image() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
                 padding: '10px 20px',
                 background: 'rgba(255, 255, 255, 0.2)',
                 borderRadius: '100px',
-                backdropFilter: 'blur(10px)',
               }}
             >
               <span
