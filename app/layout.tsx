@@ -38,6 +38,14 @@ export const metadata: Metadata = {
     siteName: "Chant d'Espérance - Songs of Hope",
     locale: 'en_US',
     type: 'website',
+    images: [
+      {
+        url: '/opengraph-image',
+        width: 1200,
+        height: 630,
+        alt: "Chant d'Espérance - Digital Haitian Hymnal",
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
@@ -45,6 +53,7 @@ export const metadata: Metadata = {
     description: "🎵 Complete Haitian Adventist Hymnal • Bilingual Lyrics (Français & Kreyòl) • Projection Mode • Search & Browse • Create Playlists",
     creator: '@ChantEsperance',
     site: '@ChantEsperance',
+    images: ['/twitter-image'],
   },
   robots: {
     index: true,
