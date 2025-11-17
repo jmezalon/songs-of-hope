@@ -9,19 +9,60 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ContributionType } from "@prisma/client"
+import { AddSongForm } from "@/components/forms/add-song-form"
+
+interface ContributionFormData {
+  [key: string]: string | number | boolean | null | undefined
+}
 
 interface ContributionFormProps {
   type: ContributionType
   songId?: string
   onSuccess?: () => void
+  initialData?: ContributionFormData
+  initialNotes?: string
+  contributionId?: string
 }
 
-export function ContributionForm({ type, songId, onSuccess }: ContributionFormProps) {
+export function ContributionForm({
+  type,
+  songId,
+  onSuccess,
+  initialData,
+  initialNotes,
+  contributionId,
+}: ContributionFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState<any>({})
-  const [notes, setNotes] = useState("")
+  const [formData, setFormData] = useState<ContributionFormData>(initialData || {})
+  const [notes, setNotes] = useState(initialNotes || "")
+
+  React.useEffect(() => {
+    if (initialData) {
+      setFormData(initialData)
+    }
+  }, [initialData])
+
+  React.useEffect(() => {
+    if (initialNotes !== undefined) {
+      setNotes(initialNotes)
+    }
+  }, [initialNotes])
+
+  if (type === "NEW_SONG") {
+    const isEditingContribution = Boolean(contributionId)
+    return (
+      <AddSongForm
+        initialData={initialData}
+        mode="contribution"
+        isEdit={isEditingContribution}
+        contributionId={contributionId}
+        defaultNotes={initialNotes}
+        onContributionComplete={onSuccess}
+      />
+    )
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,17 +70,26 @@ export function ContributionForm({ type, songId, onSuccess }: ContributionFormPr
     setLoading(true)
 
     try {
-      const response = await fetch("/api/admin/contributions", {
-        method: "POST",
+      const endpoint = contributionId ? `/api/admin/contributions/${contributionId}` : "/api/admin/contributions"
+      const method = contributionId ? "PATCH" : "POST"
+      const payload = contributionId
+        ? {
+            data: formData,
+            notes,
+          }
+        : {
+            type,
+            songId,
+            data: formData,
+            notes,
+          }
+
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          type,
-          songId,
-          data: formData,
-          notes,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {

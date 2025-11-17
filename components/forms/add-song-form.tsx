@@ -32,8 +32,12 @@ interface Section {
 }
 
 interface AddSongFormProps {
-  initialData?: any
+  initialData?: unknown
   isEdit?: boolean
+  mode?: "direct" | "contribution"
+  contributionId?: string
+  defaultNotes?: string
+  onContributionComplete?: () => void
 }
 
 const steps = [
@@ -45,9 +49,82 @@ const steps = [
 
 const timeSignatures = ["2/4", "3/4", "4/4", "6/8", "9/8", "12/8"]
 
+// Minimal shape of a song coming from the API, sufficient for the form transform
+type ApiSong = {
+  id: string
+  sectionId: string | null
+  songNumber: number | null
+  language: string
+  title: string
+  titleKreyol?: string | null
+  subtitle?: string | null
+  subtitleKreyol?: string | null
+  companionSongId?: string | null
+  tune?: string | null
+  meter?: string | null
+  musicalKey?: string | null
+  timeSignature?: string | null
+  tempo?: string | null
+  author?: string | null
+  authorKreyol?: string | null
+  composer?: string | null
+  translator?: string | null
+  arranger?: string | null
+  yearWritten?: number | null
+  copyrightStatus?: string | null
+  copyrightInfo?: string | null
+  difficulty?: string | null
+  firstLine?: string | null
+  firstLineKreyol?: string | null
+  summary?: string | null
+  notes?: string | null
+  status?: string | null
+  verses?: {
+    id: string
+    type: string
+    verseNumber: number | null
+    label: string | null
+    labelKreyol: string | null
+    sortOrder: number
+    isRepeated: boolean
+    lines?: {
+      id: string
+      text: string
+      textKreyol: string | null
+      lineNumber: number
+      isIndented: boolean
+      indent: number
+    }[]
+  }[]
+  themes?: {
+    theme: {
+      id: string
+    }
+  }[]
+  biblicalRefs?: {
+    biblicalReference: {
+      id: string
+      book: string
+      chapter: number
+      verseStart: number
+      verseEnd: number
+    }
+  }[]
+  media?: {
+    id: string
+    type: string
+    url: string
+    title: string | null
+  }[]
+}
+
 // Transform API song data to form format
-function transformSongToFormData(song: any): Partial<SongFormValues> {
+function transformSongToFormData(song: ApiSong | SongFormValues | null | undefined): Partial<SongFormValues> {
   if (!song) return defaultValues
+
+  if ("songType" in song) {
+    return song as SongFormValues
+  }
 
   return {
     songType: song.section ? "hymnal" : "popular",
@@ -112,12 +189,21 @@ function transformSongToFormData(song: any): Partial<SongFormValues> {
   }
 }
 
-export function AddSongForm({ initialData, isEdit = false }: AddSongFormProps = {}) {
+export function AddSongForm({
+  initialData,
+  isEdit = false,
+  mode = "direct",
+  contributionId,
+  defaultNotes,
+  onContributionComplete,
+}: AddSongFormProps = {}) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = React.useState(1)
   const [sections, setSections] = React.useState<Section[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
   const [showAdvanced, setShowAdvanced] = React.useState(false)
+  const isContributionMode = mode === "contribution"
+  const [submissionNotes, setSubmissionNotes] = React.useState(defaultNotes || "")
 
   // Transform initial data if editing
   const formDefaultValues = React.useMemo(() => {
@@ -148,6 +234,12 @@ export function AddSongForm({ initialData, isEdit = false }: AddSongFormProps = 
     }
   }, [isEdit, initialData, reset])
 
+  React.useEffect(() => {
+    if (typeof defaultNotes === "string") {
+      setSubmissionNotes(defaultNotes)
+    }
+  }, [defaultNotes])
+
   const songType = watch("songType")
   const language = watch("language")
   const copyrightStatus = watch("copyrightStatus")
@@ -176,6 +268,49 @@ export function AddSongForm({ initialData, isEdit = false }: AddSongFormProps = 
   const submitSong = async (data: SongFormValues, statusOverride?: "DRAFT" | "PUBLISHED") => {
     setIsLoading(true)
     try {
+      if (isContributionMode) {
+        const submitData: SongFormValues = {
+          ...data,
+          status: "PENDING_REVIEW",
+        }
+
+        const endpoint = contributionId ? `/api/admin/contributions/${contributionId}` : "/api/admin/contributions"
+        const method = contributionId ? "PATCH" : "POST"
+        const body = contributionId
+          ? { data: submitData, notes: submissionNotes || undefined }
+          : { type: "NEW_SONG", data: submitData, notes: submissionNotes || undefined }
+
+        const response = await fetch(endpoint, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          const errorMessage = result.error || "Failed to submit contribution"
+          const details = result.details ? `\n\nDetails:\n${JSON.stringify(result.details, null, 2)}` : ""
+          throw new Error(errorMessage + details)
+        }
+
+        toast.success(
+          contributionId
+            ? "Contribution updated and resubmitted for review"
+            : "Contribution submitted for review",
+          {
+            description: "We'll notify you once an admin reviews your submission.",
+            duration: 5000,
+          }
+        )
+
+        onContributionComplete?.()
+        router.push("/admin/contributions/my")
+        return
+      }
+
       // Use status override if provided
       const submitData = statusOverride ? { ...data, status: statusOverride } : data
 
@@ -199,7 +334,8 @@ export function AddSongForm({ initialData, isEdit = false }: AddSongFormProps = 
         throw new Error(errorMessage + details)
       }
 
-      // Show success toast
+      const redirectPath = "/admin/songs"
+
       toast.success(
         `Song "${result.song.title}" ${isEdit ? "updated" : data.status === "PUBLISHED" ? "published" : "saved"} successfully!`,
         {
@@ -214,7 +350,7 @@ export function AddSongForm({ initialData, isEdit = false }: AddSongFormProps = 
 
       // Redirect after a short delay to let user see the toast
       setTimeout(() => {
-        router.push("/admin/songs")
+        router.push(redirectPath)
       }, 500)
     } catch (error) {
       console.error("Error submitting form:", error)
@@ -717,6 +853,22 @@ export function AddSongForm({ initialData, isEdit = false }: AddSongFormProps = 
                   data={watch()}
                   errors={errors}
                 />
+                {isContributionMode && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Notes for the reviewer (optional)
+                    </label>
+                    <Textarea
+                      placeholder="Share any context or special instructions for the reviewer."
+                      value={submissionNotes}
+                      onChange={(e) => setSubmissionNotes(e.target.value)}
+                      rows={4}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      These notes are visible only to administrators handling your submission.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -740,6 +892,26 @@ export function AddSongForm({ initialData, isEdit = false }: AddSongFormProps = 
               <Button type="button" onClick={nextStep}>
                 Next
                 <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : isContributionMode ? (
+              <Button
+                type="button"
+                onClick={async () => {
+                  const isValid = await trigger()
+                  if (isValid) {
+                    handleSubmit((data) => submitSong(data))()
+                  } else {
+                    toast.error("Please fix the form errors before submitting")
+                  }
+                }}
+                disabled={isLoading}
+                className="cursor-pointer"
+              >
+                {isLoading
+                  ? "Submitting..."
+                  : contributionId
+                  ? "Resubmit for Review"
+                  : "Submit for Review"}
               </Button>
             ) : (
               <>

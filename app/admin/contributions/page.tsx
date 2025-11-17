@@ -1,7 +1,7 @@
-"use client"
+ "use client"
 
 import * as React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   CheckCircle,
   XCircle,
@@ -29,19 +29,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Select,
-} from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { formatDate } from "@/lib/utils"
 import { ContributionStatus, ContributionType } from "@prisma/client"
+import type { SongFormValues, LyricVerse } from "@/lib/validations/song"
+
+interface ContributionData {
+  // Shape varies by contribution type; keep flexible here
+  [key: string]: unknown
+}
 
 interface Contribution {
   id: string
   type: ContributionType
   status: ContributionStatus
-  data: any
+  data: ContributionData
   notes?: string
   reviewNotes?: string
   createdAt: string
@@ -59,6 +63,12 @@ interface Contribution {
     titleKreyol?: string
     songNumber?: number
   }
+}
+
+interface SectionLookup {
+  id: string
+  name: string
+  nameKreyol: string | null
 }
 
 const getContributionTypeLabel = (type: ContributionType) => {
@@ -83,6 +93,46 @@ const getContributionTypeIcon = (type: ContributionType) => {
   }
 }
 
+const isSongContribution = (data: ContributionData): data is SongFormValues => {
+  if (!data || typeof data !== "object") return false
+  return "title" in data && "songType" in data && "language" in data
+}
+
+const VersePreview = ({ verse }: { verse: LyricVerse }) => {
+  return (
+    <div className="rounded-md border bg-white px-3 py-2">
+      <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+        <span className="font-medium text-gray-700">{verse.label || verse.type}</span>
+        {verse.verseNumber && <span>#{verse.verseNumber}</span>}
+      </div>
+      {verse.lines && verse.lines.length > 0 ? (
+        <div className="space-y-1">
+          {verse.lines.map((line) => (
+            <div key={line.id} className="text-sm text-gray-900">
+              {line.text}
+              {line.textKreyol && (
+                <div className="text-xs text-gray-500">{line.textKreyol}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No lines provided</p>
+      )}
+    </div>
+  )
+}
+
+const DetailItem = ({ label, value }: { label: string; value?: React.ReactNode }) => {
+  if (!value) return null
+  return (
+    <div>
+      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</div>
+      <div className="text-sm text-gray-900">{value}</div>
+    </div>
+  )
+}
+
 const getStatusBadge = (status: ContributionStatus) => {
   switch (status) {
     case "PENDING":
@@ -97,6 +147,9 @@ const getStatusBadge = (status: ContributionStatus) => {
 }
 
 export default function ContributionsPage() {
+  const router = useRouter()
+  const { data: session, status } = useSession()
+
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedContribution, setSelectedContribution] = useState<Contribution | null>(null)
@@ -104,12 +157,9 @@ export default function ContributionsPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<ContributionStatus | "ALL">("ALL")
   const [typeFilter, setTypeFilter] = useState<ContributionType | "ALL">("ALL")
+  const [sections, setSections] = useState<SectionLookup[]>([])
 
-  useEffect(() => {
-    fetchContributions()
-  }, [statusFilter, typeFilter])
-
-  const fetchContributions = async () => {
+  const fetchContributions = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -130,7 +180,40 @@ export default function ContributionsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [statusFilter, typeFilter])
+
+  useEffect(() => {
+    if (status === "loading") return
+
+    // Only admins can review and approve contributions. Contributors should not
+    // see the review dashboard at all.
+    if (!session || session.user.role !== "ADMIN") {
+      router.replace("/admin/contributions/new")
+      return
+    }
+
+    fetchContributions()
+  }, [statusFilter, typeFilter, session, status, router, fetchContributions])
+
+  useEffect(() => {
+    async function loadSections() {
+      try {
+        const response = await fetch("/api/sections")
+        if (!response.ok) return
+        const data = await response.json()
+        setSections(
+          data.sections?.map((section: SectionLookup) => ({
+            id: section.id,
+            name: section.name,
+            nameKreyol: section.nameKreyol ?? null,
+          })) ?? []
+        )
+      } catch (error) {
+        console.error("Failed to load sections", error)
+      }
+    }
+    loadSections()
+  }, [])
 
   const handleAction = async (contributionId: string, status: ContributionStatus) => {
     try {
@@ -149,10 +232,18 @@ export default function ContributionsPage() {
 
       if (!response.ok) throw new Error("Failed to update contribution")
 
+      const result: { songId?: string | null } = await response.json()
+
       // Refresh contributions list
       await fetchContributions()
       setSelectedContribution(null)
       setReviewNotes("")
+
+      // If a song was created/updated and this was an approval, offer to go to it.
+      if (status === "APPROVED" && result.songId) {
+        // router.push(`/admin/songs/${result.songId}/edit`)
+        router.push("/admin/songs")
+      }
     } catch (error) {
       console.error("Error updating contribution:", error)
       alert("Failed to update contribution. Please try again.")
@@ -161,8 +252,26 @@ export default function ContributionsPage() {
     }
   }
 
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-lg font-semibold">Loading...</div>
+        </div>
+      </div>
+    )
+  }
+
   const pendingCount = contributions.filter((c) => c.status === "PENDING").length
   const needsRevisionCount = contributions.filter((c) => c.status === "NEEDS_REVISION").length
+
+  const songSubmission =
+    selectedContribution?.type === "NEW_SONG" && isSongContribution(selectedContribution.data)
+      ? selectedContribution.data
+      : null
+  const selectedSectionName = songSubmission
+    ? getSectionName(sections, songSubmission.sectionId || undefined)
+    : undefined
 
   return (
     <div className="space-y-6">
@@ -231,7 +340,9 @@ export default function ContributionsPage() {
               <label className="text-sm font-medium">Status</label>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
+                onChange={(e) =>
+                  setStatusFilter((e.target.value as ContributionStatus | "ALL") ?? "ALL")
+                }
                 className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
               >
                 <option value="ALL">All Status</option>
@@ -246,7 +357,9 @@ export default function ContributionsPage() {
               <label className="text-sm font-medium">Type</label>
               <select
                 value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as any)}
+                onChange={(e) =>
+                  setTypeFilter((e.target.value as ContributionType | "ALL") ?? "ALL")
+                }
                 className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
               >
                 <option value="ALL">All Types</option>
@@ -364,12 +477,84 @@ export default function ContributionsPage() {
             <CardContent className="space-y-4">
               {/* Contribution Details */}
               <div className="space-y-2">
-                <h3 className="font-semibold">Details</h3>
-                <div className="rounded-lg bg-gray-50 p-4">
-                  <pre className="text-sm overflow-x-auto">
-                    {JSON.stringify(selectedContribution.data, null, 2)}
-                  </pre>
-                </div>
+                <h3 className="font-semibold">Submission Details</h3>
+                {songSubmission ? (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border bg-white p-4 space-y-3">
+                      <div className="flex flex-wrap gap-4">
+                        <DetailItem label="Title" value={songSubmission.title} />
+                        <DetailItem label="Language" value={songSubmission.language} />
+                        <DetailItem label="Song Type" value={songSubmission.songType} />
+                        <DetailItem
+                          label="Status"
+                          value={
+                            <Badge variant="outline">
+                              {songSubmission.status || "PENDING_REVIEW"}
+                            </Badge>
+                          }
+                        />
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <DetailItem label="Section" value={selectedSectionName || "—"} />
+                        <DetailItem label="Song Number" value={songSubmission.songNumber || "—"} />
+                        <DetailItem label="Author" value={songSubmission.author} />
+                        <DetailItem label="Composer" value={songSubmission.composer} />
+                      </div>
+                    </div>
+
+                    {songSubmission.summary && (
+                      <div className="rounded-lg border bg-white p-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Summary</h4>
+                        <p className="text-sm text-gray-800">{songSubmission.summary}</p>
+                      </div>
+                    )}
+
+                    {songSubmission.verses && songSubmission.verses.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-700">Lyrics Preview</h4>
+                        <div className="grid gap-2 max-h-60 overflow-y-auto pr-1">
+                          {songSubmission.verses.map((verse) => (
+                            <VersePreview key={verse.id} verse={verse} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="rounded-lg border bg-white p-4 grid gap-4 md:grid-cols-2">
+                      <DetailItem label="Translator" value={songSubmission.translator} />
+                      <DetailItem label="Arranger" value={songSubmission.arranger} />
+                      <DetailItem label="Year Written" value={songSubmission.yearWritten} />
+                      <DetailItem label="Difficulty" value={songSubmission.difficulty} />
+                    </div>
+
+                    {(songSubmission.media?.length || 0) > 0 && (
+                      <div className="rounded-lg border bg-white p-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Media</h4>
+                        <div className="space-y-1 text-sm">
+                          {songSubmission.media?.map((media) => (
+                            <div key={media.id} className="flex items-center justify-between">
+                              <span>{media.title || media.type}</span>
+                              <a
+                                href={media.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-purple-600 text-xs"
+                              >
+                                Open
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <pre className="text-sm overflow-x-auto">
+                      {JSON.stringify(selectedContribution.data, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
 
               {/* Contributor Notes */}
@@ -450,4 +635,10 @@ export default function ContributionsPage() {
       )}
     </div>
   )
+}
+const getSectionName = (sections: SectionLookup[], sectionId?: string | null) => {
+  if (!sectionId) return undefined
+  const match = sections.find((section) => section.id === sectionId)
+  if (!match) return sectionId
+  return match.name || sectionId
 }

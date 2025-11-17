@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { songFormSchema } from "@/lib/validations/song"
-import { requireContributor } from "@/lib/authorization"
+import { requireContributor, getCurrentUser } from "@/lib/authorization"
 import { z } from "zod"
+import { createSongWithRelations, SongServiceError } from "@/lib/services/song-service"
 
 export async function POST(request: NextRequest) {
   // Require authentication - only CONTRIBUTOR or ADMIN can create songs
@@ -16,230 +17,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-
-    // Validate the request body
     const validatedData = songFormSchema.parse(body)
-
-    // Get collectionId from section if it's a hymnal song
-    let collectionId: string
-
-    if (validatedData.songType === "hymnal" && validatedData.sectionId) {
-      const section = await prisma.section.findUnique({
-        where: { id: validatedData.sectionId },
-        select: { collectionId: true },
-      })
-
-      if (!section) {
-        return NextResponse.json(
-          { error: "Section not found" },
-          { status: 404 }
-        )
-      }
-
-      collectionId = section.collectionId
-    } else {
-      // For popular songs, get the default "Popular Songs" collection
-      const popularCollection = await prisma.collection.findFirst({
-        where: {
-          name: "Popular Songs",
-          isActive: true,
-        },
-      })
-
-      if (!popularCollection) {
-        return NextResponse.json(
-          { error: "Popular Songs collection not found. Please create it first." },
-          { status: 404 }
-        )
-      }
-
-      collectionId = popularCollection.id
-    }
-
-    // Extract first line from verses if not provided
-    const firstLine = validatedData.firstLine ||
-      (validatedData.verses?.[0]?.lines?.[0]?.text || undefined)
-    const firstLineKreyol = validatedData.firstLineKreyol ||
-      (validatedData.verses?.[0]?.lines?.[0]?.textKreyol || undefined)
-
-    // Create song with all related data in a transaction
-    const song = await prisma.$transaction(async (tx) => {
-      // Create the song
-      const createdSong = await tx.song.create({
-        data: {
-          // Basic Information
-          title: validatedData.title,
-          titleKreyol: validatedData.titleKreyol || undefined,
-          subtitle: validatedData.subtitle || undefined,
-          subtitleKreyol: validatedData.subtitleKreyol || undefined,
-
-          // Collection & Section
-          collectionId,
-          sectionId: validatedData.sectionId || undefined,
-          songNumber: validatedData.songNumber || undefined,
-          language: validatedData.language || "BILINGUAL",
-          companionSongId: validatedData.companionSongId || undefined,
-
-          // Musical Information
-          tune: validatedData.tune || undefined,
-          meter: validatedData.meter || undefined,
-          musicalKey: validatedData.musicalKey || undefined,
-          timeSignature: validatedData.timeSignature || undefined,
-          tempo: validatedData.tempo || undefined,
-
-          // Attribution
-          author: validatedData.author || undefined,
-          authorKreyol: validatedData.authorKreyol || undefined,
-          composer: validatedData.composer || undefined,
-          translator: validatedData.translator || undefined,
-          arranger: validatedData.arranger || undefined,
-          yearWritten: validatedData.yearWritten || undefined,
-          copyrightStatus: validatedData.copyrightStatus,
-          copyrightInfo: validatedData.copyrightInfo || undefined,
-
-          // Metadata
-          firstLine: firstLine || undefined,
-          firstLineKreyol: firstLineKreyol || undefined,
-          summary: validatedData.summary || undefined,
-          notes: validatedData.notes || undefined,
-
-          // Status
-          status: validatedData.status,
-          publishedAt: validatedData.status === "PUBLISHED" ? new Date() : null,
-        },
-      })
-
-      // Create verses and lines
-      if (validatedData.verses && validatedData.verses.length > 0) {
-        for (const verse of validatedData.verses) {
-          const createdVerse = await tx.verse.create({
-            data: {
-              songId: createdSong.id,
-              type: verse.type,
-              verseNumber: verse.verseNumber || undefined,
-              label: verse.label || undefined,
-              labelKreyol: verse.labelKreyol || undefined,
-              sortOrder: verse.sortOrder,
-              isRepeated: verse.isRepeated,
-            },
-          })
-
-          // Create lines for this verse
-          if (verse.lines && verse.lines.length > 0) {
-            await tx.line.createMany({
-              data: verse.lines.map((line) => ({
-                verseId: createdVerse.id,
-                text: line.text,
-                textKreyol: line.textKreyol || undefined,
-                lineNumber: line.lineNumber,
-                isIndented: line.isIndented,
-                indent: line.indent,
-              })),
-            })
-          }
-        }
-      }
-
-      // Create theme relationships
-      if (validatedData.themeIds && validatedData.themeIds.length > 0) {
-        // Validate that all theme IDs exist
-        const existingThemes = await tx.theme.findMany({
-          where: {
-            id: {
-              in: validatedData.themeIds,
-            },
-          },
-          select: { id: true },
-        })
-
-        const existingThemeIds = existingThemes.map((t) => t.id)
-        const invalidThemeIds = validatedData.themeIds.filter(
-          (id) => !existingThemeIds.includes(id)
-        )
-
-        if (invalidThemeIds.length > 0) {
-          throw new Error(
-            `Invalid theme IDs: ${invalidThemeIds.join(", ")}. Please select valid themes.`
-          )
-        }
-
-        await tx.songTheme.createMany({
-          data: validatedData.themeIds.map((themeId) => ({
-            songId: createdSong.id,
-            themeId,
-          })),
-        })
-      }
-
-      // Create biblical references and relationships
-      if (validatedData.biblicalReferences && validatedData.biblicalReferences.length > 0) {
-        for (const ref of validatedData.biblicalReferences) {
-          // Try to find existing biblical reference or create new one
-          const biblicalRef = await tx.biblicalReference.upsert({
-            where: {
-              id: ref.id,
-            },
-            update: {},
-            create: {
-              book: ref.book,
-              chapter: ref.chapter,
-              verseStart: ref.verseStart,
-              verseEnd: ref.verseEnd,
-            },
-          })
-
-          // Create the relationship
-          await tx.songBiblicalReference.create({
-            data: {
-              songId: createdSong.id,
-              biblicalReferenceId: biblicalRef.id,
-            },
-          })
-        }
-      }
-
-      // Create media records
-      if (validatedData.media && validatedData.media.length > 0) {
-        await tx.media.createMany({
-          data: validatedData.media.map((mediaItem, index) => ({
-            songId: createdSong.id,
-            type: mediaItem.type,
-            url: mediaItem.url,
-            title: mediaItem.title || undefined,
-            sortOrder: index,
-            isPublic: true,
-          })),
-        })
-      }
-
-      // Return the created song with all relations
-      return await tx.song.findUnique({
-        where: { id: createdSong.id },
-        include: {
-          verses: {
-            include: {
-              lines: {
-                orderBy: { lineNumber: "asc" },
-              },
-            },
-            orderBy: { sortOrder: "asc" },
-          },
-          themes: {
-            include: {
-              theme: true,
-            },
-          },
-          biblicalRefs: {
-            include: {
-              biblicalReference: true,
-            },
-          },
-          media: {
-            orderBy: { sortOrder: "asc" },
-          },
-        },
-      })
-    })
+    const song = await createSongWithRelations(validatedData)
 
     return NextResponse.json(
       {
@@ -253,7 +32,6 @@ export async function POST(request: NextRequest) {
     console.error("Error details:", error instanceof Error ? error.message : String(error))
     console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace")
 
-    // Handle Zod validation errors
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
@@ -264,7 +42,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Handle Prisma unique constraint violations
+    if (error instanceof SongServiceError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      )
+    }
+
     if (error instanceof Error && error.message.includes("Unique constraint")) {
       return NextResponse.json(
         {
@@ -274,7 +58,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Return detailed error message in development
     return NextResponse.json(
       {
         error: "Failed to create song",
@@ -298,14 +81,19 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")
     const sortBy = searchParams.get("sortBy") || "songNumber"
     const sortOrder = searchParams.get("sortOrder") || "asc"
+    const user = await getCurrentUser()
+    const isPrivileged = !!user && (user.role === "ADMIN" || user.role === "CONTRIBUTOR")
 
     const skip = (page - 1) * limit
 
     const where: any = {}
 
     // Apply filters
-    if (status) {
+    if (status && isPrivileged) {
       where.status = status
+    }
+    if (!isPrivileged) {
+      where.status = "PUBLISHED"
     }
 
     if (sectionId) {

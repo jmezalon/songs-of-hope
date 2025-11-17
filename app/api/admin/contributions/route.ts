@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { withAuth, requireContributor } from "@/lib/authorization"
+import { withAuth } from "@/lib/authorization"
 import { ContributionStatus, ContributionType } from "@prisma/client"
+import { songFormSchema, type SongFormValues } from "@/lib/validations/song"
 import { z } from "zod"
-
-// Validation schema for creating a contribution
-const contributionSchema = z.object({
-  songId: z.string().optional(),
-  type: z.nativeEnum(ContributionType),
-  data: z.record(z.any()), // JSON data for the contribution
-  notes: z.string().optional(),
-})
 
 /**
  * POST /api/admin/contributions
@@ -22,16 +15,47 @@ export async function POST(request: NextRequest) {
     try {
       const body = await request.json()
 
-      // Validate request body
-      const validation = contributionSchema.safeParse(body)
-      if (!validation.success) {
+      const { songId, type, data, notes } = body as {
+        songId?: string
+        type?: ContributionType
+        data?: unknown
+        notes?: string
+      }
+
+      // Basic runtime validation instead of Zod to avoid runtime issues
+      if (!type || !Object.values(ContributionType).includes(type)) {
         return NextResponse.json(
-          { error: "Invalid request data", details: validation.error.issues },
+          { error: "Invalid contribution type" },
           { status: 400 }
         )
       }
 
-      const { songId, type, data, notes } = validation.data
+      if (data === undefined || data === null || typeof data !== "object" || Array.isArray(data)) {
+        return NextResponse.json(
+          { error: "Invalid contribution data" },
+          { status: 400 }
+        )
+      }
+
+      let normalizedData: unknown = data
+      if (type === ContributionType.NEW_SONG) {
+        try {
+          normalizedData = songFormSchema.parse(data as SongFormValues)
+        } catch (parseError) {
+          if (parseError instanceof z.ZodError) {
+            return NextResponse.json(
+              { error: "Validation failed", details: parseError.issues },
+              { status: 400 }
+            )
+          }
+          if (parseError instanceof Error) {
+            return NextResponse.json(
+              { error: parseError.message },
+              { status: 400 }
+            )
+          }
+        }
+      }
 
       // If songId is provided, verify it exists
       if (songId) {
@@ -52,7 +76,7 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           songId,
           type,
-          data,
+          data: normalizedData as Record<string, unknown>,
           notes,
           status: ContributionStatus.PENDING,
         },

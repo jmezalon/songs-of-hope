@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
+import { requireAdmin } from "@/lib/authorization"
 
 // Validation schema for search request
 const searchSchema = z.object({
@@ -175,6 +176,16 @@ export async function POST(request: NextRequest) {
 
     // Validate the request body
     const { query, limit, includeVerses, adminMode } = searchSchema.parse(body)
+
+    if (adminMode) {
+      const adminUser = await requireAdmin().catch(() => null)
+      if (!adminUser) {
+        return NextResponse.json(
+          { error: "Forbidden" },
+          { status: 403 }
+        )
+      }
+    }
 
     const lowerQuery = query.toLowerCase()
 

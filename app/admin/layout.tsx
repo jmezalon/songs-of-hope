@@ -12,6 +12,7 @@ import {
   Tags,
   Image,
   Users,
+  FileText,
   Menu,
   X,
   LogOut,
@@ -43,6 +44,11 @@ const navItems: NavItem[] = [
     icon: Music,
   },
   {
+    title: "My Contributions",
+    href: "/admin/contributions/my",
+    icon: FileText,
+  },
+  {
     title: "Add Song",
     href: "/admin/songs/new",
     icon: Plus,
@@ -62,6 +68,9 @@ const navItems: NavItem[] = [
     href: "/admin/media",
     icon: Image,
   },
+  // Admin-only navigation item. We keep the href pointing at /admin/users,
+  // which itself can expose the users / contributions UI, but we will only
+  // render this in the sidebar for admins below.
   {
     title: "Users & Contributions",
     href: "/admin/users",
@@ -182,7 +191,16 @@ export default function AdminLayout({
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-            {navItems.map((item) => {
+            {navItems
+              // Contributors should not see admin-only tabs like Users & Contributions.
+              // We treat ADMIN as the only role that can manage users / reviews.
+              .filter((item) => {
+                if (item.href === "/admin/users") {
+                  return session.user.role === "ADMIN"
+                }
+                return true
+              })
+              .map((item) => {
               const isActive = pathname === item.href
               const Icon = item.icon
               return (
@@ -227,7 +245,7 @@ export default function AdminLayout({
               </div>
             </div>
             <div className="mt-2 mb-2 px-3">
-              <Badge variant={getRoleBadgeVariant(session.user.role) as any} className="text-xs">
+              <Badge variant={getRoleBadgeVariant(session.user.role)} className="text-xs">
                 {userRole}
               </Badge>
             </div>
@@ -282,7 +300,7 @@ export default function AdminLayout({
 
           {/* User menu (desktop) */}
           <div className="hidden items-center gap-2 md:flex">
-            <Badge variant={getRoleBadgeVariant(session.user.role) as any} className="text-xs">
+            <Badge variant={getRoleBadgeVariant(session.user.role)} className="text-xs">
               {userRole}
             </Badge>
             <Avatar className="h-8 w-8">
