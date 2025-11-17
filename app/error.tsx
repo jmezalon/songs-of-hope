@@ -47,12 +47,10 @@ export default function Error({
             <RotateCcw className="mr-2 h-4 w-4" />
             Try Again
           </Button>
-          <Button asChild variant="outline" size="lg">
-            <a href="/">
-              <Home className="mr-2 h-4 w-4" />
-              Go Home
-            </a>
-          </Button>
+          <a href="/" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-10 px-8 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground">
+            <Home className="mr-2 h-4 w-4" />
+            Go Home
+          </a>
         </div>
 
         {/* Help text */}
