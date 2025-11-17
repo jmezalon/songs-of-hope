@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/table"
 import { toast } from "sonner"
 import { SearchBar } from "@/components/search/search-bar"
+import { SongTableSkeleton } from "@/components/ui/table-skeleton"
 
 // Types
 interface Song {
@@ -627,75 +628,78 @@ export default function SongsPage() {
 
           {/* Bulk Actions */}
           {Object.keys(rowSelection).length > 0 && (
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-lg border bg-muted/50 p-3">
               <span className="text-sm font-medium">{Object.keys(rowSelection).length} selected</span>
-              <div className="ml-auto flex gap-2">
+              <div className="flex flex-wrap gap-2 sm:ml-auto">
                 <Button variant="outline" size="sm" onClick={handleBulkPublish}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Publish
+                  <CheckCircle2 className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Publish</span>
+                  <span className="sm:hidden">Pub</span>
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleExportCSV}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
+                  <Download className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Export</span>
+                  <span className="sm:hidden">Exp</span>
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleBulkDelete} className="text-red-500">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  <Trash2 className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Delete</span>
+                  <span className="sm:hidden">Del</span>
                 </Button>
               </div>
             </div>
           )}
 
           {/* Table */}
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center">
-                      Loading songs...
-                    </TableCell>
-                  </TableRow>
-                ) : table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
+          <div className="rounded-md border overflow-hidden">
+            <div className="overflow-x-auto">
+              {loading ? (
+                <SongTableSkeleton rows={10} />
+              ) : (
+                <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead key={header.id}>
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(header.column.columnDef.header, header.getContext())}
+                        </TableHead>
                       ))}
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center">
-                      No songs found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={columns.length} className="h-24 text-center">
+                        No songs found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              )}
+            </div>
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-muted-foreground">
               Showing {data.length} of {pagination.total} songs
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Button
                 variant="outline"
                 size="sm"
