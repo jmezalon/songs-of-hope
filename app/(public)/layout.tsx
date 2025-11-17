@@ -98,7 +98,6 @@ export default function PublicLayout({
                   <Link href="/login">
                     <Button variant="ghost" size="sm">
                       <LogIn className="h-4 w-4 mr-2" />
-                      Sign In
                     </Button>
                   </Link>
                   <Link href="/register">
