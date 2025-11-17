@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Menu, X, Search, BookOpen, Heart, List, LogOut } from "lucide-react";
+import { Menu, X, Search, BookOpen, Heart, List, LogOut, LogIn, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 interface MobileMenuProps {
@@ -90,6 +90,30 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
                 <BookOpen className="h-5 w-5 mr-3" />
                 <span className="font-medium">Browse</span>
               </Link>
+
+              {!isAuthenticated && (
+                <>
+                  <div className="border-t border-gray-100 my-2" />
+
+                  <Link
+                    href="/login"
+                    onClick={closeMenu}
+                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors duration-150"
+                  >
+                    <LogIn className="h-5 w-5 mr-3" />
+                    <span className="font-medium">Login</span>
+                  </Link>
+
+                  <Link
+                    href="/register"
+                    onClick={closeMenu}
+                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors duration-150"
+                  >
+                    <UserPlus className="h-5 w-5 mr-3" />
+                    <span className="font-medium">Register</span>
+                  </Link>
+                </>
+              )}
 
               {isAuthenticated && (
                 <>
