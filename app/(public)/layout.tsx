@@ -83,7 +83,7 @@ export default function PublicLayout({
                 <Link href="/profile">
                   <Button variant="ghost" size="sm">
                     <User className="h-4 w-4 mr-2" />
-                    {user.name.split(" ")[0] || user.email.split(" ")[0][0]}
+                    {user.name.split(" ")[0] || user.email.split("@")[0]}
                   </Button>
                 </Link>
                 <Button variant="ghost" size="sm" onClick={handleLogout}>
