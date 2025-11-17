@@ -18,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Plus, Trash2, GripVertical, IndentDecrease, IndentIncrease, FileText } from "lucide-react"
+import { Plus, Trash2, GripVertical, IndentDecrease, IndentIncrease, FileText, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import type { LyricLine, LyricVerse } from "@/lib/validations/song"
+import { parseSmartLyrics } from "@/lib/lyrics-parser"
 
 interface LyricsEditorProps {
   verses: LyricVerse[]
@@ -374,9 +375,32 @@ function VerseCard({
 
 // Main Lyrics Editor Component
 export function LyricsEditor({ verses, onChange, language = "FRANCAIS" }: LyricsEditorProps) {
+  const [showSmartPaste, setShowSmartPaste] = React.useState(false)
+  const [smartPasteText, setSmartPasteText] = React.useState("")
+
   const handleAddVerse = () => {
     const newVerse = createEmptyVerse(verses.length)
     onChange([...verses, newVerse])
+  }
+
+  const handleSmartPaste = () => {
+    if (smartPasteText.trim()) {
+      const parsedVerses = parseSmartLyrics(smartPasteText, 0)
+
+      // If there are existing verses, ask for confirmation or append
+      if (verses.length > 0) {
+        // For now, we'll replace all verses. You could add a confirmation dialog here
+        if (confirm("This will replace all existing lyrics. Continue?")) {
+          onChange(parsedVerses)
+          setSmartPasteText("")
+          setShowSmartPaste(false)
+        }
+      } else {
+        onChange(parsedVerses)
+        setSmartPasteText("")
+        setShowSmartPaste(false)
+      }
+    }
   }
 
   const handleRemoveVerse = (id: string) => {
@@ -476,15 +500,87 @@ export function LyricsEditor({ verses, onChange, language = "FRANCAIS" }: Lyrics
 
   return (
     <div className="space-y-4">
-      {verses.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-          <p className="text-sm text-gray-600 mb-4">No lyrics added yet. Start by adding a verse, chorus, or other section.</p>
-          <Button type="button" onClick={handleAddVerse}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Section
-          </Button>
-        </div>
+      {/* Smart Paste Section */}
+      {showSmartPaste ? (
+        <Card className="border-2 border-primary">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg">Smart Paste Lyrics</CardTitle>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowSmartPaste(false)
+                  setSmartPasteText("")
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Paste your complete song lyrics</Label>
+              <Textarea
+                value={smartPasteText}
+                onChange={(e) => setSmartPasteText(e.target.value)}
+                placeholder="Paste your complete lyrics here...&#10;&#10;The parser will automatically:&#10;• Create new sections from empty lines&#10;• Detect verse numbers (Verse 1, V. 2, 1., etc.)&#10;• Recognize keywords: Chorus, Refrain, Bridge, Kè, etc.&#10;• Convert new lines into lyric lines&#10;&#10;Example:&#10;Verse 1&#10;First line of verse one&#10;Second line of verse one&#10;&#10;Chorus&#10;First line of chorus&#10;Second line of chorus&#10;&#10;Verse 2&#10;First line of verse two"
+                rows={12}
+                className="font-mono text-sm"
+              />
+            </div>
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800">
+              <p className="font-semibold mb-2">How it works:</p>
+              <ul className="space-y-1 list-disc list-inside">
+                <li>Empty lines separate sections</li>
+                <li>Keywords create section types: Verse, Chorus, Refrain, Bridge, Kè, etc.</li>
+                <li>Verse numbers are automatically detected (e.g., "Verse 1", "2.", "V. 3")</li>
+                <li>Each new line becomes a lyric line</li>
+                <li>Supports both English and Haitian Creole markers</li>
+              </ul>
+            </div>
+            <Button
+              type="button"
+              onClick={handleSmartPaste}
+              disabled={!smartPasteText.trim()}
+              className="w-full"
+              size="lg"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Parse & Create Lyrics
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowSmartPaste(true)}
+            className="flex-1"
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Smart Paste Complete Lyrics
+          </Button>
+          {verses.length === 0 && (
+            <Button type="button" onClick={handleAddVerse} className="flex-1">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Section Manually
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Existing Verses Display */}
+      {verses.length === 0 && !showSmartPaste ? (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+          <p className="text-sm text-gray-600">No lyrics added yet. Use Smart Paste to quickly add complete lyrics, or add sections manually.</p>
+        </div>
+      ) : verses.length > 0 ? (
         <>
           <div className="space-y-4">
             {verses.map((verse) => (
@@ -503,12 +599,23 @@ export function LyricsEditor({ verses, onChange, language = "FRANCAIS" }: Lyrics
             ))}
           </div>
 
-          <Button type="button" variant="outline" onClick={handleAddVerse} className="w-full">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Section (Verse, Chorus, Bridge, etc.)
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={handleAddVerse} className="flex-1">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Section (Verse, Chorus, Bridge, etc.)
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowSmartPaste(true)}
+              className="flex-1"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Smart Paste
+            </Button>
+          </div>
         </>
-      )}
+      ) : null}
 
       {verses.length > 0 && (
         <div className="mt-4 text-sm text-gray-500">
