@@ -101,14 +101,31 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
 
   const title = song.title || song.titleKreyol || `Song #${song.songNumber}`;
   const description = song.firstLine || song.firstLineKreyol || "View lyrics and details";
+  const imageUrl = song.media?.find((m: { type: string }) => m.type === "IMAGE")?.url || "/og-image.png";
 
   return {
+    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://chant-desperance.org"),
     title: `${song.songNumber}. ${title} - Chant d'Espérance`,
     description,
     openGraph: {
       title: `${song.songNumber}. ${title}`,
       description,
       type: "music.song",
+      url: `/songs/${id}`,
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${title} song preview`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${song.songNumber}. ${title}`,
+      description,
+      images: [imageUrl],
     },
   };
 }
