@@ -5,8 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Music, Search, BookOpen, Heart, List, LogIn, User, LogOut } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Chant d'Espérance - Haitian Hymnal",
-  description: "Explore the Songs of Hope - A comprehensive digital Haitian hymnal in French and Kreyòl",
+  title: "Chant d'Espérance - Digital Haitian Hymnal | Songs of Hope",
+  description: "Explore Chant d'Espérance (Songs of Hope), the complete digital Haitian Adventist Hymnal. Search and browse thousands of hymns in Français and Kreyòl with bilingual lyrics, projection mode, and biblical references.",
+  openGraph: {
+    title: "Chant d'Espérance - Songs of Hope",
+    description: "Complete digital Haitian Adventist Hymnal with bilingual lyrics in Français and Kreyòl. Perfect for worship and personal devotion.",
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "Chant d'Espérance - Songs of Hope",
+    description: "🎵 Digital Haitian Hymnal • Français & Kreyòl • Projection Mode • Free Access",
+  },
 };
 
 export default async function PublicLayout({

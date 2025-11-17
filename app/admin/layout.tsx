@@ -18,6 +18,7 @@ import {
   LogOut,
   Settings,
   Search,
+  Eye,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -297,6 +298,14 @@ export default function AdminLayout({
               />
             </div>
           </div>
+
+          {/* View Public Site Button */}
+          <Link href="/">
+            <Button variant="outline" size="sm" className="gap-2">
+              <Eye className="h-4 w-4" />
+              <span className="hidden sm:inline">View Public Site</span>
+            </Button>
+          </Link>
 
           {/* User menu (desktop) */}
           <div className="hidden items-center gap-2 md:flex">

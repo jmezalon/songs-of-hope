@@ -5,10 +5,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Chant d'Espérance - Haitian Hymnal Platform",
+    default: "Chant d'Espérance - Digital Haitian Hymnal | Songs of Hope",
     template: "%s | Chant d'Espérance"
   },
-  description: "Digital platform for Chant d'Espérance, the Haitian Adventist Hymnal. Browse, search, and manage hymns in Français, Kreyòl, and bilingual formats. Access thousands of hymns with lyrics, themes, and biblical references.",
+  description: "Explore Chant d'Espérance (Songs of Hope), the complete digital Haitian Adventist Hymnal. Search and browse thousands of hymns in Français and Kreyòl. Features bilingual lyrics, projection mode, playlists, and biblical references. Perfect for worship services and personal devotion.",
   keywords: [
     "Chant d'Espérance",
     "Haitian hymnal",
@@ -32,26 +32,19 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: "Chant d'Espérance - Haitian Hymnal Platform",
-    description: "Digital platform for Chant d'Espérance, the Haitian Adventist Hymnal. Browse, search, and manage hymns in Français, Kreyòl, and bilingual formats.",
+    title: "Chant d'Espérance - Digital Haitian Hymnal | Songs of Hope",
+    description: "Explore the complete Haitian Adventist Hymnal with thousands of songs in Français and Kreyòl. Search hymns, create playlists, and use projection mode for worship services.",
     url: '/',
-    siteName: "Chant d'Espérance",
+    siteName: "Chant d'Espérance - Songs of Hope",
     locale: 'en_US',
     type: 'website',
-    images: [
-      {
-        url: '/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: "Chant d'Espérance - Haitian Hymnal Platform",
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: "Chant d'Espérance - Haitian Hymnal Platform",
-    description: "Digital platform for Chant d'Espérance, the Haitian Adventist Hymnal.",
-    images: ['/og-image.png'],
+    title: "Chant d'Espérance - Digital Haitian Hymnal",
+    description: "🎵 Complete Haitian Adventist Hymnal • Bilingual Lyrics (Français & Kreyòl) • Projection Mode • Search & Browse • Create Playlists",
+    creator: '@ChantEsperance',
+    site: '@ChantEsperance',
   },
   robots: {
     index: true,
