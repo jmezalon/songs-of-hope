@@ -56,3 +56,67 @@ body {
   color: hsl(var(--foreground));
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Print Styles */
+@media print {
+  /* Hide UI elements when printing */
+  .print\:hidden,
+  header,
+  footer,
+  nav,
+  button,
+  [role="button"] {
+    display: none !important;
+  }
+
+  /* Optimize for print */
+  body {
+    background: white;
+    color: black;
+  }
+
+  /* Remove shadows and borders for cleaner print */
+  .print\:shadow-none {
+    box-shadow: none !important;
+  }
+
+  /* Ensure proper page breaks */
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .page-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+
+  /* Better typography for print */
+  h1 {
+    font-size: 24pt;
+    margin-bottom: 12pt;
+  }
+
+  h2 {
+    font-size: 20pt;
+    margin-bottom: 10pt;
+  }
+
+  h3 {
+    font-size: 16pt;
+    margin-bottom: 8pt;
+  }
+
+  p, li {
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  /* Print song lyrics with good spacing */
+  .song-lyrics {
+    font-size: 14pt;
+    line-height: 1.8;
+  }
+}
