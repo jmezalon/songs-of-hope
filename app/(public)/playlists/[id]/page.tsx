@@ -103,7 +103,7 @@ export default async function PlaylistPage({ params }: PlaylistPageProps) {
   const isOwner = playlist.userId === user.id;
 
   return (
-    <div className="container py-8">
+    <div className="container py-8 px-4 md:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <Link href="/playlists">
