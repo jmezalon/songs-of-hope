@@ -75,8 +75,9 @@ export function SongActions({
   const toggleFavorite = async () => {
     if (!userId) {
       // Redirect to login with callback URL to return here after signing in
+      // Using replace() instead of push() so back button doesn't go to login page
       const currentUrl = window.location.pathname;
-      router.push(`/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
+      router.replace(`/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
       return;
     }
 
@@ -107,8 +108,9 @@ export function SongActions({
   const handleAddToPlaylist = () => {
     if (!userId) {
       // Redirect to login with callback URL to return here after signing in
+      // Using replace() instead of push() so back button doesn't go to login page
       const currentUrl = window.location.pathname;
-      router.push(`/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
+      router.replace(`/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
       return;
     }
     setShowPlaylistDialog(true);
