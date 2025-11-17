@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Menu, Search, BookOpen, Heart, List } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
+import { Menu, X, Search, BookOpen, Heart, List, LogOut } from "lucide-react";
+import { toast } from "sonner";
 
 interface MobileMenuProps {
   isAuthenticated: boolean;
@@ -11,9 +14,22 @@ interface MobileMenuProps {
 export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
+
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirect: false });
+      toast.success("Logged out successfully");
+      closeMenu();
+      router.push("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Failed to logout");
+    }
+  };
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -38,7 +54,11 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
         aria-label="Toggle menu"
         aria-expanded={isOpen}
       >
-        <Menu className={`h-6 w-6 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
+        {isOpen ? (
+          <X className="h-6 w-6 transition-transform duration-200" />
+        ) : (
+          <Menu className="h-6 w-6 transition-transform duration-200" />
+        )}
       </button>
 
       {/* Dropdown Menu */}
@@ -92,6 +112,16 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
                     <List className="h-5 w-5 mr-3" />
                     <span className="font-medium">Playlists</span>
                   </Link>
+
+                  <div className="border-t border-gray-100 my-2" />
+
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors duration-150"
+                  >
+                    <LogOut className="h-5 w-5 mr-3" />
+                    <span className="font-medium">Logout</span>
+                  </button>
                 </>
               )}
             </nav>
