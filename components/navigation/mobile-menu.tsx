@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Menu, X, Search, BookOpen, Heart, List } from "lucide-react";
+import { Menu, Search, BookOpen, Heart, List } from "lucide-react";
 
 interface MobileMenuProps {
   isAuthenticated: boolean;
@@ -11,73 +10,87 @@ interface MobileMenuProps {
 
 export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        closeMenu();
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen]);
+
   return (
-    <>
-      {/* Hamburger Button - Only visible on mobile */}
+    <div className="relative md:hidden" ref={menuRef}>
+      {/* Hamburger Button */}
       <button
         onClick={toggleMenu}
-        className="md:hidden p-2 hover:bg-gray-100 rounded-md transition-colors"
+        className="p-2 hover:bg-gray-100 rounded-lg transition-all duration-200 active:scale-95"
         aria-label="Toggle menu"
+        aria-expanded={isOpen}
       >
-        <Menu className="h-6 w-6" />
+        <Menu className={`h-6 w-6 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
       </button>
 
-      {/* Mobile Menu Overlay */}
+      {/* Dropdown Menu */}
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop - for mobile only */}
           <div
-            className="fixed inset-0 bg-black/50 z-50 md:hidden"
+            className="fixed inset-0 bg-black/20 z-40"
             onClick={closeMenu}
           />
 
-          {/* Slide-out Menu */}
-          <div className="fixed top-0 right-0 bottom-0 w-64 bg-white z-50 shadow-lg md:hidden">
-            {/* Close Button */}
-            <div className="flex justify-end p-4 border-b">
-              <button
+          {/* Dropdown Menu */}
+          <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+            <nav className="py-2">
+              <Link
+                href="/"
                 onClick={closeMenu}
-                className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-                aria-label="Close menu"
+                className="flex items-center px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors duration-150"
               >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            {/* Navigation Links */}
-            <nav className="flex flex-col p-4 gap-2">
-              <Link href="/" onClick={closeMenu}>
-                <Button variant="ghost" className="w-full justify-start" size="lg">
-                  <Search className="h-5 w-5 mr-3" />
-                  Search
-                </Button>
+                <Search className="h-5 w-5 mr-3" />
+                <span className="font-medium">Search</span>
               </Link>
 
-              <Link href="/search" onClick={closeMenu}>
-                <Button variant="ghost" className="w-full justify-start" size="lg">
-                  <BookOpen className="h-5 w-5 mr-3" />
-                  Browse
-                </Button>
+              <Link
+                href="/search"
+                onClick={closeMenu}
+                className="flex items-center px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors duration-150"
+              >
+                <BookOpen className="h-5 w-5 mr-3" />
+                <span className="font-medium">Browse</span>
               </Link>
 
               {isAuthenticated && (
                 <>
-                  <Link href="/favorites" onClick={closeMenu}>
-                    <Button variant="ghost" className="w-full justify-start" size="lg">
-                      <Heart className="h-5 w-5 mr-3" />
-                      Favorites
-                    </Button>
+                  <div className="border-t border-gray-100 my-2" />
+
+                  <Link
+                    href="/favorites"
+                    onClick={closeMenu}
+                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors duration-150"
+                  >
+                    <Heart className="h-5 w-5 mr-3" />
+                    <span className="font-medium">Favorites</span>
                   </Link>
 
-                  <Link href="/playlists" onClick={closeMenu}>
-                    <Button variant="ghost" className="w-full justify-start" size="lg">
-                      <List className="h-5 w-5 mr-3" />
-                      Playlists
-                    </Button>
+                  <Link
+                    href="/playlists"
+                    onClick={closeMenu}
+                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors duration-150"
+                  >
+                    <List className="h-5 w-5 mr-3" />
+                    <span className="font-medium">Playlists</span>
                   </Link>
                 </>
               )}
@@ -85,6 +98,6 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
           </div>
         </>
       )}
-    </>
+    </div>
   );
 }
