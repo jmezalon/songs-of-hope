@@ -1,30 +1,31 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/authorization";
+import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Music, Search, BookOpen, Heart, List, LogIn, User, LogOut } from "lucide-react";
+import { toast } from "sonner";
 
-export const metadata: Metadata = {
-  title: "Chant d'Espérance - Digital Haitian Hymnal | Songs of Hope",
-  description: "Explore Chant d'Espérance (Songs of Hope), the complete digital Haitian Adventist Hymnal. Search and browse thousands of hymns in Français and Kreyòl with bilingual lyrics, projection mode, and biblical references.",
-  openGraph: {
-    title: "Chant d'Espérance - Songs of Hope",
-    description: "Complete digital Haitian Adventist Hymnal with bilingual lyrics in Français and Kreyòl. Perfect for worship and personal devotion.",
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: "Chant d'Espérance - Songs of Hope",
-    description: "🎵 Digital Haitian Hymnal • Français & Kreyòl • Projection Mode • Free Access",
-  },
-};
-
-export default async function PublicLayout({
+export default function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
+  const router = useRouter();
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirect: false });
+      toast.success("Logged out successfully");
+      router.push("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Failed to logout");
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -85,12 +86,10 @@ export default async function PublicLayout({
                     {user.name || user.email}
                   </Button>
                 </Link>
-                <form action="/api/auth/signout" method="post">
-                  <Button variant="ghost" size="sm" type="submit">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
-                  </Button>
-                </form>
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
               </>
             ) : (
               <>

@@ -36,6 +36,12 @@ export function SongActions({
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
 
+  const handleBack = () => {
+    // Always go to homepage to avoid navigation issues
+    // This ensures users never accidentally go back to login page
+    router.push('/');
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -122,7 +128,7 @@ export function SongActions({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Button
             variant="ghost"
-            onClick={() => router.back()}
+            onClick={handleBack}
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
