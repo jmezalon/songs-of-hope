@@ -72,42 +72,45 @@ export default function PublicLayout({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Mobile Menu - Only visible on mobile */}
-            <MobileMenu isAuthenticated={!!user} />
-
-            {user ? (
-              <>
-                {(user.role === "ADMIN" || user.role === "CONTRIBUTOR") && (
-                  <Link href="/admin">
-                    <Button variant="outline" size="sm">
-                      Admin Panel
+            {/* Desktop user buttons - hidden on mobile */}
+            <div className="hidden md:flex items-center gap-2">
+              {user ? (
+                <>
+                  {(user.role === "ADMIN" || user.role === "CONTRIBUTOR") && (
+                    <Link href="/admin">
+                      <Button variant="outline" size="sm">
+                        Admin Panel
+                      </Button>
+                    </Link>
+                  )}
+                  <Link href="/profile">
+                    <Button variant="ghost" size="sm">
+                      <User className="h-4 w-4 mr-2" />
+                      {user.name?.split(" ")[0] || user.email?.split("@")[0] || "User"}
                     </Button>
                   </Link>
-                )}
-                <Link href="/profile">
-                  <Button variant="ghost" size="sm">
-                    <User className="h-4 w-4 mr-2" />
-                    {user.name?.split(" ")[0] || user.email?.split("@")[0] || "User"}
+                  <Button variant="ghost" size="sm" onClick={handleLogout}>
+                    <LogOut className="h-4 w-4 mr-2" />
                   </Button>
-                </Link>
-                <Button variant="ghost" size="sm" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <Link href="/login">
-                  <Button variant="ghost" size="sm">
-                    <LogIn className="h-4 w-4 mr-2" />
-                  </Button>
-                </Link>
-                <Link href="/register">
-                  <Button size="sm">
-                    Register
-                  </Button>
-                </Link>
-              </>
-            )}
+                </>
+              ) : (
+                <>
+                  <Link href="/login">
+                    <Button variant="ghost" size="sm">
+                      <LogIn className="h-4 w-4 mr-2" />
+                    </Button>
+                  </Link>
+                  <Link href="/register">
+                    <Button size="sm">
+                      Register
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* Mobile Menu - Only visible on mobile, positioned on far right */}
+            <MobileMenu isAuthenticated={!!user} />
           </div>
         </div>
       </header>
