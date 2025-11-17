@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { unstable_noStore as noStore } from "next/cache"
 import {
   Music,
   BookOpen,
@@ -86,6 +87,7 @@ const formatLanguageName = (code: string) =>
   languageLabels[code as LanguageCode] ?? code
 
 export default async function AdminDashboard() {
+  noStore()
   const now = new Date()
   const oneWeekAgo = new Date(now)
   oneWeekAgo.setDate(now.getDate() - 7)
