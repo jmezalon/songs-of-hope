@@ -101,10 +101,16 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
 
   const title = song.title || song.titleKreyol || `Song #${song.songNumber}`;
   const description = song.firstLine || song.firstLineKreyol || "View lyrics and details";
-  const imageUrl = song.media?.find((m: { type: string }) => m.type === "IMAGE")?.url || "/og-image.png";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "https://chant-desperance.org";
+
+  // Use song media image if available, otherwise use the site's opengraph-image
+  const songImage = song.media?.find((m: { type: string }) => m.type === "IMAGE")?.url;
+  const imageUrl = songImage || `${baseUrl}/opengraph-image`;
 
   return {
-    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://chant-desperance.org"),
+    metadataBase: new URL(baseUrl),
     title: `${song.songNumber}. ${title} - Chant d'Espérance`,
     description,
     openGraph: {
@@ -112,12 +118,13 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
       description,
       type: "music.song",
       url: `/songs/${id}`,
+      siteName: "Chant d'Espérance - Songs of Hope",
       images: [
         {
           url: imageUrl,
           width: 1200,
           height: 630,
-          alt: `${title} song preview`,
+          alt: `${title} - Chant d'Espérance`,
         },
       ],
     },
@@ -125,6 +132,8 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
       card: "summary_large_image",
       title: `${song.songNumber}. ${title}`,
       description,
+      creator: "@ChantEsperance",
+      site: "@ChantEsperance",
       images: [imageUrl],
     },
   };
