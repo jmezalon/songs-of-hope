@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Loader2,
 } from "lucide-react"
 import {
   useReactTable,
@@ -70,6 +71,46 @@ interface Song {
   createdAt: string
 }
 
+interface SongDetails {
+  id: string
+  title: string
+  titleKreyol: string | null
+  language: Song["language"]
+  status: Song["status"] | "PENDING_REVIEW"
+  songNumber: number | null
+  section: {
+    name: string
+    nameKreyol: string | null
+  } | null
+  collection: {
+    name: string
+    nameKreyol: string | null
+  }
+  firstLine: string | null
+  firstLineKreyol: string | null
+  author: string | null
+  composer: string | null
+  translator: string | null
+  summary: string | null
+  notes: string | null
+  verses: {
+    id: string
+    label: string | null
+    type: string
+    lines: {
+      id: string
+      text: string
+      textKreyol: string | null
+    }[]
+  }[]
+  media: {
+    id: string
+    type: string
+    title: string | null
+    url: string
+  }[]
+}
+
 interface SongsResponse {
   songs: Song[]
   pagination: {
@@ -105,6 +146,9 @@ export default function SongsPage() {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
   const [showFilters, setShowFilters] = React.useState(false)
+  const [quickViewOpen, setQuickViewOpen] = React.useState(false)
+  const [quickViewSong, setQuickViewSong] = React.useState<SongDetails | null>(null)
+  const [quickViewLoading, setQuickViewLoading] = React.useState(false)
 
   // Fetch songs
   const fetchSongs = React.useCallback(async () => {
@@ -380,6 +424,33 @@ export default function SongsPage() {
     }
   }
 
+  const openQuickView = async (songId: string) => {
+    setQuickViewOpen(true)
+    setQuickViewLoading(true)
+    setQuickViewSong(null)
+
+    try {
+      const response = await fetch(`/api/songs/${songId}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch song details")
+      }
+      const data = await response.json()
+      setQuickViewSong(data.song as SongDetails)
+    } catch (error) {
+      console.error("Error loading song details:", error)
+      toast.error("Failed to load song details")
+      setQuickViewOpen(false)
+    } finally {
+      setQuickViewLoading(false)
+    }
+  }
+
+  const closeQuickView = () => {
+    setQuickViewOpen(false)
+    setQuickViewSong(null)
+    setQuickViewLoading(false)
+  }
+
   const handleDelete = async (songId: string) => {
     if (!canManageSongs) return
     if (!confirm("Are you sure you want to delete this song?")) {
@@ -524,14 +595,14 @@ export default function SongsPage() {
               const song = row.original
               return (
                 <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toast.info("Quick view coming soon...")}
-                    title="Quick view"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openQuickView(song.id)}
+              title="Quick view"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
                   <Link href={`/admin/songs/${song.id}/edit`}>
                     <Button variant="ghost" size="sm" title="Edit">
                       <Edit className="h-4 w-4" />
@@ -594,6 +665,7 @@ export default function SongsPage() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -788,5 +860,167 @@ export default function SongsPage() {
         </CardContent>
       </Card>
     </div>
+
+      {quickViewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-2xl">
+                    {quickViewSong?.title || "Loading song..."}
+                  </CardTitle>
+                  <CardDescription className="text-sm">
+                    {quickViewSong?.songNumber
+                      ? `Song #${quickViewSong.songNumber}`
+                      : "Unnumbered Song"}
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" onClick={closeQuickView}>
+                  Close
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {quickViewLoading && (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+                </div>
+              )}
+
+              {!quickViewLoading && quickViewSong && (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge>{quickViewSong.language}</Badge>
+                    <Badge variant="outline">{quickViewSong.status}</Badge>
+                    {quickViewSong.section && (
+                      <Badge variant="outline">
+                        {quickViewSong.section.name}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase">Collection</p>
+                      <p className="text-sm text-gray-900">{quickViewSong.collection.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase">First Line</p>
+                      <p className="text-sm text-gray-900">
+                        {quickViewSong.firstLine || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase">Author</p>
+                      <p className="text-sm text-gray-900">{quickViewSong.author || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase">Composer</p>
+                      <p className="text-sm text-gray-900">{quickViewSong.composer || "—"}</p>
+                    </div>
+                  </div>
+
+                  {(quickViewSong.summary || quickViewSong.notes) && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm text-gray-700">Summary</h4>
+                      <p className="text-sm text-gray-800">
+                        {quickViewSong.summary || quickViewSong.notes}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-sm text-gray-700">Lyrics Preview</h4>
+                      {quickViewSong.verses.length > 3 && (
+                        <span className="text-xs text-gray-500">
+                          Showing first 3 sections
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid gap-3 max-h-64 overflow-y-auto pr-1">
+                      {quickViewSong.verses.slice(0, 3).map((verse) => (
+                        <div key={verse.id} className="rounded-md border bg-white px-3 py-2">
+                          <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                            <span className="font-medium text-gray-700">
+                              {verse.label || verse.type}
+                            </span>
+                            {typeof verse.type === "string" && (
+                              <span>{verse.type}</span>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            {verse.lines.slice(0, 4).map((line) => (
+                              <p key={line.id} className="text-sm text-gray-900">
+                                {line.text}
+                                {line.textKreyol && (
+                                  <span className="block text-xs text-gray-500">
+                                    {line.textKreyol}
+                                  </span>
+                                )}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {quickViewSong.verses.length === 0 && (
+                        <p className="text-sm text-gray-500">No lyrics available yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {quickViewSong.media.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm text-gray-700">Media</h4>
+                      <div className="divide-y rounded-md border bg-white">
+                        {quickViewSong.media.map((media) => (
+                          <div
+                            key={media.id}
+                            className="flex items-center justify-between px-3 py-2 text-sm"
+                          >
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {media.title || media.type}
+                              </p>
+                              <p className="text-xs text-gray-500 uppercase">
+                                {media.type}
+                              </p>
+                            </div>
+                            <a
+                              href={media.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-purple-600 text-xs"
+                            >
+                              Open
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2 pt-2">
+                    {canManageSongs && (
+                      <Link href={`/admin/songs/${quickViewSong.id}/edit`}>
+                        <Button className="w-full">Open in Editor</Button>
+                      </Link>
+                    )}
+                    <Button variant="outline" onClick={closeQuickView} className="w-full">
+                      Close
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {!quickViewLoading && !quickViewSong && (
+                <p className="text-sm text-gray-500">Unable to load song details.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </>
   )
 }
