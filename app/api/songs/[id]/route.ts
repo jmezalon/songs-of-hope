@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { songFormSchema } from "@/lib/validations/song"
+import { requireContributor } from "@/lib/authorization"
 import { z } from "zod"
 
 // GET /api/songs/[id] - Get single song with all relations
@@ -122,6 +123,15 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Require authentication - only CONTRIBUTOR or ADMIN can update songs
+  const user = await requireContributor().catch(() => null)
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized: You must be logged in as a contributor or admin to update songs" },
+      { status: 401 }
+    )
+  }
+
   try {
     const { id } = await params
     const body = await request.json()
@@ -425,6 +435,15 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Require authentication - only CONTRIBUTOR or ADMIN can delete songs
+  const user = await requireContributor().catch(() => null)
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized: You must be logged in as a contributor or admin to delete songs" },
+      { status: 401 }
+    )
+  }
+
   try {
     const { id } = await params
 

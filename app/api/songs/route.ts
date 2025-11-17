@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { songFormSchema } from "@/lib/validations/song"
+import { requireContributor } from "@/lib/authorization"
 import { z } from "zod"
 
 export async function POST(request: NextRequest) {
+  // Require authentication - only CONTRIBUTOR or ADMIN can create songs
+  const user = await requireContributor().catch(() => null)
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized: You must be logged in as a contributor or admin to create songs" },
+      { status: 401 }
+    )
+  }
+
   try {
     const body = await request.json()
 
