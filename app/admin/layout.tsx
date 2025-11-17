@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useSession, signOut } from "next-auth/react"
 import {
   LayoutDashboard,
   Music,
@@ -19,7 +20,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { toast } from "sonner"
 
 interface NavItem {
   title: string
@@ -73,6 +76,68 @@ export default function AdminLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+  const { data: session, status } = useSession()
+
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirect: false })
+      toast.success("Logged out successfully")
+      router.push("/login")
+    } catch (error) {
+      console.error("Logout error:", error)
+      toast.error("Failed to logout")
+    }
+  }
+
+  const getUserInitials = (name: string | null | undefined) => {
+    if (!name) return "U"
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case "ADMIN":
+        return "default"
+      case "CONTRIBUTOR":
+        return "secondary"
+      default:
+        return "outline"
+    }
+  }
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case "ADMIN":
+        return "Admin"
+      case "CONTRIBUTOR":
+        return "Contributor"
+      default:
+        return "User"
+    }
+  }
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-semibold">Loading...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
+  const userInitials = getUserInitials(session.user.name)
+  const userRole = getRoleLabel(session.user.role)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -149,26 +214,29 @@ export default function AdminLayout({
             <div className="flex items-center gap-3 rounded-lg px-3 py-2">
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white">
-                  AD
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
                 <p className="truncate text-sm font-medium text-gray-900">
-                  Admin User
+                  {session.user.name || "User"}
                 </p>
                 <p className="truncate text-xs text-gray-500">
-                  admin@chantesperance.com
+                  {session.user.email}
                 </p>
               </div>
+            </div>
+            <div className="mt-2 mb-2 px-3">
+              <Badge variant={getRoleBadgeVariant(session.user.role) as any} className="text-xs">
+                {userRole}
+              </Badge>
             </div>
             <div className="mt-2 flex gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 className="flex-1"
-                onClick={() => {
-                  // Settings logic
-                }}
+                onClick={() => router.push("/admin/settings")}
               >
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
@@ -176,9 +244,8 @@ export default function AdminLayout({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  // Logout logic
-                }}
+                onClick={handleLogout}
+                title="Logout"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -215,14 +282,17 @@ export default function AdminLayout({
 
           {/* User menu (desktop) */}
           <div className="hidden items-center gap-2 md:flex">
+            <Badge variant={getRoleBadgeVariant(session.user.role) as any} className="text-xs">
+              {userRole}
+            </Badge>
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-xs text-white">
-                AD
+                {userInitials}
               </AvatarFallback>
             </Avatar>
             <div className="hidden xl:block">
-              <p className="text-sm font-medium text-gray-900">Admin User</p>
-              <p className="text-xs text-gray-500">Administrator</p>
+              <p className="text-sm font-medium text-gray-900">{session.user.name || "User"}</p>
+              <p className="text-xs text-gray-500">{session.user.email}</p>
             </div>
           </div>
         </header>
