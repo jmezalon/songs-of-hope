@@ -3,12 +3,143 @@ import { prisma } from "@/lib/prisma"
 import { songFormSchema } from "@/lib/validations/song"
 import { z } from "zod"
 
-export async function POST(request: NextRequest) {
+// GET /api/songs/[id] - Get single song with all relations
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params
+
+    const song = await prisma.song.findUnique({
+      where: { id },
+      include: {
+        collection: {
+          select: {
+            id: true,
+            name: true,
+            nameKreyol: true,
+          },
+        },
+        section: {
+          select: {
+            id: true,
+            name: true,
+            nameKreyol: true,
+          },
+        },
+        verses: {
+          include: {
+            lines: {
+              orderBy: { lineNumber: "asc" },
+            },
+          },
+          orderBy: { sortOrder: "asc" },
+        },
+        themes: {
+          include: {
+            theme: {
+              select: {
+                id: true,
+                name: true,
+                nameKreyol: true,
+                category: true,
+              },
+            },
+          },
+        },
+        biblicalRefs: {
+          include: {
+            biblicalReference: {
+              select: {
+                id: true,
+                book: true,
+                chapter: true,
+                verseStart: true,
+                verseEnd: true,
+              },
+            },
+          },
+        },
+        media: {
+          orderBy: { sortOrder: "asc" },
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            url: true,
+            thumbnailUrl: true,
+            duration: true,
+            sortOrder: true,
+          },
+        },
+        companionSong: {
+          select: {
+            id: true,
+            title: true,
+            titleKreyol: true,
+            songNumber: true,
+          },
+        },
+        _count: {
+          select: {
+            favorites: true,
+          },
+        },
+      },
+    })
+
+    if (!song) {
+      return NextResponse.json(
+        { error: "Song not found" },
+        { status: 404 }
+      )
+    }
+
+    // Increment view count asynchronously (don't await)
+    prisma.song.update({
+      where: { id },
+      data: { viewCount: { increment: 1 } },
+    }).catch((error) => {
+      console.error("Failed to increment view count:", error)
+    })
+
+    return NextResponse.json({ song })
+  } catch (error) {
+    console.error("Error fetching song:", error)
+    return NextResponse.json(
+      {
+        error: "Failed to fetch song",
+        message: error instanceof Error ? error.message : "Unknown error"
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT /api/songs/[id] - Update song
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
     const body = await request.json()
 
     // Validate the request body
     const validatedData = songFormSchema.parse(body)
+
+    // Check if song exists
+    const existingSong = await prisma.song.findUnique({
+      where: { id },
+    })
+
+    if (!existingSong) {
+      return NextResponse.json(
+        { error: "Song not found" },
+        { status: 404 }
+      )
+    }
 
     // Get collectionId from section if it's a hymnal song
     let collectionId: string
@@ -38,7 +169,7 @@ export async function POST(request: NextRequest) {
 
       if (!popularCollection) {
         return NextResponse.json(
-          { error: "Popular Songs collection not found. Please create it first." },
+          { error: "Popular Songs collection not found" },
           { status: 404 }
         )
       }
@@ -52,10 +183,11 @@ export async function POST(request: NextRequest) {
     const firstLineKreyol = validatedData.firstLineKreyol ||
       (validatedData.verses?.[0]?.lines?.[0]?.textKreyol || undefined)
 
-    // Create song with all related data in a transaction
+    // Update song with all related data in a transaction
     const song = await prisma.$transaction(async (tx) => {
-      // Create the song
-      const createdSong = await tx.song.create({
+      // Update the song
+      const updatedSong = await tx.song.update({
+        where: { id },
         data: {
           // Basic Information
           title: validatedData.title,
@@ -95,16 +227,23 @@ export async function POST(request: NextRequest) {
 
           // Status
           status: validatedData.status,
-          publishedAt: validatedData.status === "PUBLISHED" ? new Date() : null,
+          publishedAt: validatedData.status === "PUBLISHED" && !existingSong.publishedAt
+            ? new Date()
+            : existingSong.publishedAt,
         },
       })
 
-      // Create verses and lines
+      // Delete existing verses and lines (cascade will handle lines)
+      await tx.verse.deleteMany({
+        where: { songId: id },
+      })
+
+      // Create new verses and lines
       if (validatedData.verses && validatedData.verses.length > 0) {
         for (const verse of validatedData.verses) {
           const createdVerse = await tx.verse.create({
             data: {
-              songId: createdSong.id,
+              songId: id,
               type: verse.type,
               verseNumber: verse.verseNumber || undefined,
               label: verse.label || undefined,
@@ -130,7 +269,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Create theme relationships
+      // Delete and recreate theme relationships
+      await tx.songTheme.deleteMany({
+        where: { songId: id },
+      })
+
       if (validatedData.themeIds && validatedData.themeIds.length > 0) {
         // Validate that all theme IDs exist
         const existingThemes = await tx.theme.findMany({
@@ -155,13 +298,17 @@ export async function POST(request: NextRequest) {
 
         await tx.songTheme.createMany({
           data: validatedData.themeIds.map((themeId) => ({
-            songId: createdSong.id,
+            songId: id,
             themeId,
           })),
         })
       }
 
-      // Create biblical references and relationships
+      // Delete and recreate biblical reference relationships
+      await tx.songBiblicalReference.deleteMany({
+        where: { songId: id },
+      })
+
       if (validatedData.biblicalReferences && validatedData.biblicalReferences.length > 0) {
         for (const ref of validatedData.biblicalReferences) {
           // Try to find existing biblical reference or create new one
@@ -181,18 +328,22 @@ export async function POST(request: NextRequest) {
           // Create the relationship
           await tx.songBiblicalReference.create({
             data: {
-              songId: createdSong.id,
+              songId: id,
               biblicalReferenceId: biblicalRef.id,
             },
           })
         }
       }
 
-      // Create media records
+      // Delete and recreate media records
+      await tx.media.deleteMany({
+        where: { songId: id },
+      })
+
       if (validatedData.media && validatedData.media.length > 0) {
         await tx.media.createMany({
           data: validatedData.media.map((mediaItem, index) => ({
-            songId: createdSong.id,
+            songId: id,
             type: mediaItem.type,
             url: mediaItem.url,
             title: mediaItem.title || undefined,
@@ -202,9 +353,9 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Return the created song with all relations
+      // Return the updated song with all relations
       return await tx.song.findUnique({
-        where: { id: createdSong.id },
+        where: { id },
         include: {
           verses: {
             include: {
@@ -231,17 +382,12 @@ export async function POST(request: NextRequest) {
       })
     })
 
-    return NextResponse.json(
-      {
-        message: "Song created successfully",
-        song,
-      },
-      { status: 201 }
-    )
+    return NextResponse.json({
+      message: "Song updated successfully",
+      song,
+    })
   } catch (error) {
-    console.error("Error creating song:", error)
-    console.error("Error details:", error instanceof Error ? error.message : String(error))
-    console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace")
+    console.error("Error updating song:", error)
 
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
@@ -264,125 +410,51 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Return detailed error message in development
     return NextResponse.json(
       {
-        error: "Failed to create song",
-        message: error instanceof Error ? error.message : String(error),
-        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : String(error)) : undefined
+        error: "Failed to update song",
+        message: error instanceof Error ? error.message : "Unknown error"
       },
       { status: 500 }
     )
   }
 }
 
-export async function GET(request: NextRequest) {
+// DELETE /api/songs/[id] - Delete song
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get("page") || "1")
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100) // Max 100 per page
-    const status = searchParams.get("status")
-    const sectionId = searchParams.get("sectionId")
-    const collectionId = searchParams.get("collectionId")
-    const language = searchParams.get("language")
-    const search = searchParams.get("search")
-    const sortBy = searchParams.get("sortBy") || "songNumber"
-    const sortOrder = searchParams.get("sortOrder") || "asc"
+    const { id } = await params
 
-    const skip = (page - 1) * limit
+    // Check if song exists
+    const existingSong = await prisma.song.findUnique({
+      where: { id },
+      select: { id: true, title: true },
+    })
 
-    const where: any = {}
-
-    // Apply filters
-    if (status) {
-      where.status = status
+    if (!existingSong) {
+      return NextResponse.json(
+        { error: "Song not found" },
+        { status: 404 }
+      )
     }
 
-    if (sectionId) {
-      where.sectionId = sectionId
-    }
-
-    if (collectionId) {
-      where.collectionId = collectionId
-    }
-
-    if (language) {
-      where.language = language
-    }
-
-    // Apply search across multiple fields
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: "insensitive" } },
-        { titleKreyol: { contains: search, mode: "insensitive" } },
-        { firstLine: { contains: search, mode: "insensitive" } },
-        { firstLineKreyol: { contains: search, mode: "insensitive" } },
-        { author: { contains: search, mode: "insensitive" } },
-        { composer: { contains: search, mode: "insensitive" } },
-      ]
-    }
-
-    // Determine sort order
-    const orderBy: any = []
-    if (sortBy === "songNumber") {
-      orderBy.push({ sectionId: "asc" })
-      orderBy.push({ songNumber: sortOrder })
-    } else if (sortBy === "title") {
-      orderBy.push({ title: sortOrder })
-    } else if (sortBy === "createdAt") {
-      orderBy.push({ createdAt: sortOrder })
-    } else if (sortBy === "viewCount") {
-      orderBy.push({ viewCount: sortOrder })
-    } else {
-      orderBy.push({ sectionId: "asc" })
-      orderBy.push({ songNumber: "asc" })
-    }
-
-    const [songs, total] = await Promise.all([
-      prisma.song.findMany({
-        where,
-        include: {
-          section: {
-            select: {
-              name: true,
-              nameKreyol: true,
-            },
-          },
-          collection: {
-            select: {
-              name: true,
-              nameKreyol: true,
-            },
-          },
-          _count: {
-            select: {
-              verses: true,
-              themes: true,
-              favorites: true,
-            },
-          },
-        },
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.song.count({ where }),
-    ])
+    // Delete song (cascade will handle related records)
+    await prisma.song.delete({
+      where: { id },
+    })
 
     return NextResponse.json({
-      songs,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      message: "Song deleted successfully",
+      deletedSong: existingSong,
     })
   } catch (error) {
-    console.error("Error fetching songs:", error)
+    console.error("Error deleting song:", error)
     return NextResponse.json(
       {
-        error: "Failed to fetch songs",
+        error: "Failed to delete song",
         message: error instanceof Error ? error.message : "Unknown error"
       },
       { status: 500 }

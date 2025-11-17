@@ -59,6 +59,7 @@ enum Language {
   KREYOL
   BILINGUAL
   ENGLISH
+  SPANISH
 }
 
 enum SongStatus {

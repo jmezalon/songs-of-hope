@@ -55,7 +55,7 @@ export const songFormSchema = z.object({
     },
     z.number().int().positive().optional()
   ),
-  language: z.enum(["FRANCAIS", "KREYOL", "BILINGUAL"]).optional(),
+  language: z.enum(["FRANCAIS", "KREYOL", "BILINGUAL", "ENGLISH", "SPANISH"]).optional(),
 
   // Basic info
   title: z.string().min(1, "Title is required"),
@@ -115,6 +115,10 @@ export const songFormSchema = z.object({
     // If song type is hymnal, section and number are required
     if (data.songType === "hymnal") {
       return data.sectionId && data.songNumber && data.language
+    }
+    // For popular songs, language is required
+    if (data.songType === "popular") {
+      return data.language
     }
     return true
   },

@@ -2,43 +2,36 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
-// Validation schema for creating a section
-const createSectionSchema = z.object({
-  collectionId: z.string().min(1, "Collection ID is required"),
-  name: z.string().min(1, "Section name is required"),
+// Validation schema for creating a theme
+const createThemeSchema = z.object({
+  name: z.string().min(1, "Theme name is required"),
   nameKreyol: z.string().optional(),
+  category: z.enum(["OCCASION", "SEASON", "TOPIC", "MOOD", "LITURGICAL", "BIBLICAL"]),
   description: z.string().optional(),
   sortOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
 })
 
-// GET /api/sections - List all sections
+// GET /api/themes - List all themes
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const collectionId = searchParams.get("collectionId")
+    const category = searchParams.get("category")
     const isActive = searchParams.get("isActive")
 
     const where: any = {}
 
-    if (collectionId) {
-      where.collectionId = collectionId
+    if (category) {
+      where.category = category
     }
 
     if (isActive !== null && isActive !== undefined) {
       where.isActive = isActive === "true"
     }
 
-    const sections = await prisma.section.findMany({
+    const themes = await prisma.theme.findMany({
       where,
       include: {
-        collection: {
-          select: {
-            id: true,
-            name: true,
-            nameKreyol: true,
-          },
-        },
         _count: {
           select: {
             songs: true,
@@ -46,17 +39,17 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: [
-        { collectionId: "asc" },
+        { category: "asc" },
         { sortOrder: "asc" },
       ],
     })
 
-    return NextResponse.json({ sections })
+    return NextResponse.json({ themes })
   } catch (error) {
-    console.error("Error fetching sections:", error)
+    console.error("Error fetching themes:", error)
     return NextResponse.json(
       {
-        error: "Failed to fetch sections",
+        error: "Failed to fetch themes",
         message: error instanceof Error ? error.message : "Unknown error"
       },
       { status: 500 }
@@ -64,56 +57,35 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/sections - Create new section (admin only)
+// POST /api/themes - Create new theme
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
     // Validate the request body
-    const validatedData = createSectionSchema.parse(body)
+    const validatedData = createThemeSchema.parse(body)
 
-    // Check if collection exists
-    const collection = await prisma.collection.findUnique({
-      where: { id: validatedData.collectionId },
-    })
-
-    if (!collection) {
-      return NextResponse.json(
-        { error: "Collection not found" },
-        { status: 404 }
-      )
-    }
-
-    // Create section
-    const section = await prisma.section.create({
+    // Create theme
+    const theme = await prisma.theme.create({
       data: {
-        collectionId: validatedData.collectionId,
         name: validatedData.name,
         nameKreyol: validatedData.nameKreyol || undefined,
+        category: validatedData.category,
         description: validatedData.description || undefined,
         sortOrder: validatedData.sortOrder,
         isActive: validatedData.isActive,
-      },
-      include: {
-        collection: {
-          select: {
-            id: true,
-            name: true,
-            nameKreyol: true,
-          },
-        },
       },
     })
 
     return NextResponse.json(
       {
-        message: "Section created successfully",
-        section,
+        message: "Theme created successfully",
+        theme,
       },
       { status: 201 }
     )
   } catch (error) {
-    console.error("Error creating section:", error)
+    console.error("Error creating theme:", error)
 
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
@@ -130,7 +102,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.message.includes("Unique constraint")) {
       return NextResponse.json(
         {
-          error: "A section with this name already exists in this collection",
+          error: "A theme with this name already exists",
         },
         { status: 409 }
       )
@@ -138,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        error: "Failed to create section",
+        error: "Failed to create theme",
         message: error instanceof Error ? error.message : "Unknown error"
       },
       { status: 500 }
