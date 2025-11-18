@@ -49,11 +49,13 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
   return (
     <div className="relative md:hidden" ref={menuRef}>
       <div className="flex items-center gap-2">
-        <Link href="/admin">
-          <Button variant="outline" size="sm">
-            Admin Panel
-          </Button>
-        </Link>
+        {isAuthenticated && (
+          <Link href="/admin">
+            <Button variant="outline" size="sm">
+              Admin Panel
+            </Button>
+          </Link>
+        )}
         {/* Hamburger Button */}
         <button
           onClick={toggleMenu}
