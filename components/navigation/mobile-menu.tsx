@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Menu, X, Search, BookOpen, Heart, List, LogOut, LogIn, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "../ui/button";
 
 interface MobileMenuProps {
   isAuthenticated: boolean;
@@ -47,24 +48,26 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
 
   return (
     <div className="relative md:hidden" ref={menuRef}>
-      <Link href="/admin">
-        <Button variant="outline" size="sm">
-          Admin Panel
-        </Button>
-      </Link>
-      {/* Hamburger Button */}
-      <button
-        onClick={toggleMenu}
-        className="p-2 hover:bg-gray-100 rounded-lg transition-all duration-200 active:scale-95"
-        aria-label="Toggle menu"
-        aria-expanded={isOpen}
-      >
-        {isOpen ? (
-          <X className="h-6 w-6 transition-transform duration-200" />
-        ) : (
-          <Menu className="h-6 w-6 transition-transform duration-200" />
-        )}
-      </button>
+      <div className="flex items-center gap-2">
+        <Link href="/admin">
+          <Button variant="outline" size="sm">
+            Admin Panel
+          </Button>
+        </Link>
+        {/* Hamburger Button */}
+        <button
+          onClick={toggleMenu}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-all duration-200 active:scale-95"
+          aria-label="Toggle menu"
+          aria-expanded={isOpen}
+        >
+          {isOpen ? (
+            <X className="h-6 w-6 transition-transform duration-200" />
+          ) : (
+            <Menu className="h-6 w-6 transition-transform duration-200" />
+          )}
+        </button>
+      </div>
 
       {/* Dropdown Menu */}
       {isOpen && (
