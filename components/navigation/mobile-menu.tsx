@@ -47,6 +47,11 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
 
   return (
     <div className="relative md:hidden" ref={menuRef}>
+      <Link href="/admin">
+        <Button variant="outline" size="sm">
+          Admin Panel
+        </Button>
+      </Link>
       {/* Hamburger Button */}
       <button
         onClick={toggleMenu}
