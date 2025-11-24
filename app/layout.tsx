@@ -3,6 +3,20 @@ import { Toaster } from "sonner";
 import { SessionProvider } from "@/components/providers/session-provider";
 import "./globals.css";
 
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXTAUTH_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
+const defaultOgImage = {
+  url: `${appUrl}/opengraph-image`,
+  width: 1200,
+  height: 630,
+  alt: "Chant d'Espérance - Digital Haitian Hymnal",
+};
+
+const defaultTwitterImage = `${appUrl}/twitter-image`;
+
 export const metadata: Metadata = {
   title: {
     default: "Chant d'Espérance - Digital Haitian Hymnal | Songs of Hope",
@@ -27,9 +41,24 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ? process.env.NEXT_PUBLIC_APP_URL : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
+  metadataBase: new URL(appUrl),
   alternates: {
     canonical: '/',
+  },
+  icons: {
+    icon: [
+      { url: `${appUrl}/favicon.ico`, sizes: "32x32" },
+      { url: `${appUrl}/favicon.ico`, sizes: "16x16" },
+    ],
+    shortcut: [`${appUrl}/favicon.ico`],
+    apple: [`${appUrl}/apple-touch-icon.png`],
+    other: [
+      {
+        rel: "mask-icon",
+        url: `${appUrl}/safari-pinned-tab.svg`,
+        color: "#8b5cf6",
+      },
+    ],
   },
   openGraph: {
     title: "Chant d'Espérance - Digital Haitian Hymnal | Songs of Hope",
@@ -38,6 +67,7 @@ export const metadata: Metadata = {
     siteName: "Chant d'Espérance - Songs of Hope",
     locale: 'en_US',
     type: 'website',
+    images: [defaultOgImage],
   },
   twitter: {
     card: 'summary_large_image',
@@ -45,6 +75,7 @@ export const metadata: Metadata = {
     description: "🎵 Complete Haitian Adventist Hymnal • Bilingual Lyrics (Français & Kreyòl) • Projection Mode • Search & Browse • Create Playlists",
     creator: '@ChantEsperance',
     site: '@ChantEsperance',
+    images: [defaultTwitterImage],
   },
   robots: {
     index: true,
