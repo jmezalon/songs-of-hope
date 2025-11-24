@@ -32,12 +32,25 @@ interface SearchResult {
   matchContext?: string
 }
 
+// Popular searches to show when the search bar is focused but empty
+const POPULAR_SEARCHES = [
+  "Gloire à Dieu",
+  "Jésus Christ",
+  "Prière",
+  "Espérance",
+  "Amour de Dieu",
+  "Salut",
+  "Foi",
+  "Grâce"
+];
+
 export const PublicSearchBar = forwardRef<{ focus: () => void }>(function PublicSearchBar(props, ref) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const debouncedQuery = useDebounce(query, 300)
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -62,11 +75,13 @@ export const PublicSearchBar = forwardRef<{ focus: () => void }>(function Public
     if (debouncedQuery.trim().length < 2) {
       setResults([]);
       setIsOpen(false);
+      setShowSuggestions(false);
       return;
     }
 
     const fetchResults = async () => {
       setIsLoading(true)
+      setShowSuggestions(false)
       try {
         const response = await fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`)
         if (response.ok) {
@@ -101,7 +116,25 @@ export const PublicSearchBar = forwardRef<{ focus: () => void }>(function Public
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleSuggestionClick = (suggestion: string) => {
+    setQuery(suggestion);
+    setShowSuggestions(false);
+    inputRef.current?.focus();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle suggestions separately
+    if (showSuggestions && e.key === "Escape") {
+      setShowSuggestions(false);
+      return;
+    }
+
+    if (showSuggestions && e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex(0);
+      return;
+    }
+
     if (!isOpen || results.length === 0) {
       if (e.key === "Enter" && query.trim()) {
         router.push(`/search?q=${encodeURIComponent(query)}`);
@@ -170,7 +203,13 @@ export const PublicSearchBar = forwardRef<{ focus: () => void }>(function Public
           onFocus={() => {
             if (results.length > 0 && query.trim()) {
               setIsOpen(true);
+            } else if (!query.trim()) {
+              setShowSuggestions(true);
             }
+          }}
+          onBlur={() => {
+            // Delay to allow click events to register
+            setTimeout(() => setShowSuggestions(false), 200);
           }}
           className="h-14 pl-12 pr-12 text-lg shadow-lg"
           suppressHydrationWarning
@@ -247,6 +286,27 @@ export const PublicSearchBar = forwardRef<{ focus: () => void }>(function Public
           <p className="text-sm text-gray-400 mt-2">
             Try searching by title, number, lyrics, or author
           </p>
+        </Card>
+      )}
+
+      {/* Popular Searches Suggestions */}
+      {showSuggestions && !query.trim() && (
+        <Card className="absolute top-full mt-2 w-full shadow-xl z-50">
+          <div className="p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 px-2">Popular Searches</h3>
+            <div className="space-y-1">
+              {POPULAR_SEARCHES.map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="w-full text-left px-3 py-2 rounded-md text-gray-700 hover:bg-primary/10 transition-colors duration-150 flex items-center gap-2"
+                >
+                  <Search className="h-4 w-4 text-gray-400" />
+                  <span>{suggestion}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </Card>
       )}
     </div>

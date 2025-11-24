@@ -17,6 +17,14 @@ import {
 import { Search, Loader2, X } from "lucide-react";
 import Link from "next/link";
 
+interface MatchContext {
+  type: "title" | "lyrics" | "author" | "composer" | "number";
+  text: string;
+  verseType?: string;
+  verseLabel?: string;
+  lineNumber?: number;
+}
+
 interface SearchResult {
   id: string;
   songNumber: number;
@@ -28,7 +36,7 @@ interface SearchResult {
   author?: string | null;
   composer?: string | null;
   relevanceScore: number;
-  matchContext?: string;
+  matchContext?: MatchContext[];
   _count?: {
     favorites: number;
   };
@@ -130,7 +138,7 @@ export function AdvancedSearchForm() {
       const response = await fetch(`/api/search?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
-        setResults(data.songs || []);
+        setResults(data.results || data.songs || []);
       } else {
         setResults([]);
       }
@@ -319,9 +327,9 @@ export function AdvancedSearchForm() {
                             {song.firstLine || song.firstLineKreyol}
                           </p>
                         )}
-                        {song.matchContext && (
+                        {song.matchContext && song.matchContext.length > 0 && (
                           <p className="text-xs text-gray-400 mt-2 line-clamp-1">
-                            Match: {song.matchContext}
+                            Match: {song.matchContext[0].text}
                           </p>
                         )}
                       </div>

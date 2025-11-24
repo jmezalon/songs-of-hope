@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 import { Menu, X, Search, BookOpen, Heart, List, LogOut, LogIn, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
+import { useSearchBar } from "@/app/(public)/search-bar-context";
 
 interface MobileMenuProps {
   isAuthenticated: boolean;
@@ -16,6 +17,7 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const searchBarRef = useSearchBar();
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
@@ -83,14 +85,28 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
           {/* Dropdown Menu */}
           <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
             <nav className="py-2">
-              <Link
-                href="/"
-                onClick={closeMenu}
-                className="flex items-center px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors duration-150"
+              <button
+                onClick={() => {
+                  closeMenu();
+                  // Navigate to home if not already there
+                  if (window.location.pathname !== '/') {
+                    router.push('/');
+                    // Wait for navigation and then focus
+                    setTimeout(() => {
+                      searchBarRef?.current?.focus();
+                    }, 100);
+                  } else {
+                    // Already on home page, just focus
+                    searchBarRef?.current?.focus();
+                    // Scroll to search bar smoothly
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+                className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors duration-150"
               >
                 <Search className="h-5 w-5 mr-3" />
                 <span className="font-medium">Search</span>
-              </Link>
+              </button>
 
               <Link
                 href="/search"

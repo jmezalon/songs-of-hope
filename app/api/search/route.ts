@@ -374,13 +374,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/search - Alternative GET endpoint for simple searches
+// GET /api/search - Alternative GET endpoint for simple searches with filters
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get("q") || searchParams.get("query")
     const limit = parseInt(searchParams.get("limit") || "20")
     const includeVerses = searchParams.get("includeVerses") === "true"
+    const language = searchParams.get("language")
+    const collectionId = searchParams.get("collectionId")
+    const sectionId = searchParams.get("sectionId")
 
     if (!query) {
       return NextResponse.json(
@@ -389,13 +392,170 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Use the POST handler logic
-    return POST(
-      new NextRequest(request.url, {
-        method: "POST",
-        body: JSON.stringify({ query, limit, includeVerses }),
+    const lowerQuery = query.toLowerCase()
+
+    // Build OR conditions for search
+    const orConditions: any[] = [
+      { title: { contains: query, mode: "insensitive" } },
+      { titleKreyol: { contains: query, mode: "insensitive" } },
+      { firstLine: { contains: query, mode: "insensitive" } },
+      { firstLineKreyol: { contains: query, mode: "insensitive" } },
+      { author: { contains: query, mode: "insensitive" } },
+      { composer: { contains: query, mode: "insensitive" } },
+    ]
+
+    // Add song number search if query is a number
+    const queryNumber = parseInt(query)
+    if (!isNaN(queryNumber)) {
+      orConditions.push({ songNumber: queryNumber })
+    }
+
+    // Build where clause with filters
+    const andConditions: any[] = [
+      { status: "PUBLISHED" },
+      { OR: orConditions },
+    ]
+
+    // Add optional filters
+    if (language && language !== "all") {
+      andConditions.push({ language })
+    }
+    if (collectionId && collectionId !== "all") {
+      andConditions.push({ collectionId })
+    }
+    if (sectionId && sectionId !== "all") {
+      andConditions.push({ sectionId })
+    }
+
+    const where: any = {
+      AND: andConditions,
+    }
+
+    // Fetch matching songs
+    let songs = await prisma.song.findMany({
+      where,
+      include: {
+        collection: {
+          select: {
+            name: true,
+            nameKreyol: true,
+          },
+        },
+        section: {
+          select: {
+            name: true,
+            nameKreyol: true,
+          },
+        },
+        verses: includeVerses
+          ? {
+              include: {
+                lines: {
+                  orderBy: { lineNumber: "asc" },
+                },
+              },
+              orderBy: { sortOrder: "asc" },
+            }
+          : false,
+      },
+      take: limit * 2,
+    })
+
+    // If searching in verses and no results found in basic fields, search verse content
+    if (includeVerses && songs.length === 0) {
+      const verseSearchWhere: any = {
+        status: "PUBLISHED",
+        verses: {
+          some: {
+            lines: {
+              some: {
+                OR: [
+                  { text: { contains: query, mode: "insensitive" } },
+                  { textKreyol: { contains: query, mode: "insensitive" } },
+                ],
+              },
+            },
+          },
+        },
+      }
+
+      if (language && language !== "all") verseSearchWhere.language = language
+      if (collectionId && collectionId !== "all") verseSearchWhere.collectionId = collectionId
+      if (sectionId && sectionId !== "all") verseSearchWhere.sectionId = sectionId
+
+      const songsWithMatchingVerses = await prisma.song.findMany({
+        where: verseSearchWhere,
+        include: {
+          collection: {
+            select: {
+              name: true,
+              nameKreyol: true,
+            },
+          },
+          section: {
+            select: {
+              name: true,
+              nameKreyol: true,
+            },
+          },
+          verses: {
+            include: {
+              lines: {
+                orderBy: { lineNumber: "asc" },
+              },
+            },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+        take: limit * 2,
       })
-    )
+
+      songs = songsWithMatchingVerses
+    }
+
+    // Calculate relevance scores and rank results
+    const rankedResults: SearchResult[] = songs.map((song) => {
+      const { score, matchedFields, matchContext } = calculateRelevance(
+        song,
+        query,
+        includeVerses ? song.verses : undefined
+      )
+
+      return {
+        id: song.id,
+        title: song.title,
+        titleKreyol: song.titleKreyol,
+        songNumber: song.songNumber,
+        author: song.author,
+        composer: song.composer,
+        firstLine: song.firstLine,
+        firstLineKreyol: song.firstLineKreyol,
+        language: song.language,
+        status: song.status,
+        collection: {
+          name: song.collection.name,
+        },
+        section: song.section
+          ? {
+              name: song.section.name,
+            }
+          : null,
+        relevanceScore: score,
+        matchedFields,
+        matchContext,
+      }
+    })
+
+    // Sort by relevance score (descending) and limit results
+    const sortedResults = rankedResults
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, limit)
+
+    return NextResponse.json({
+      query,
+      results: sortedResults,
+      total: sortedResults.length,
+    })
   } catch (error) {
     console.error("Error in GET search:", error)
     return NextResponse.json(
