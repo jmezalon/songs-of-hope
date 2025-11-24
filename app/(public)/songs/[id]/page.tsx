@@ -102,8 +102,8 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
   const titleText = song.title || song.titleKreyol || (song.songNumber ? `Song #${song.songNumber}` : "Untitled Song");
   const fullTitle = song.songNumber ? `${song.songNumber}. ${titleText}` : titleText;
   const description = song.firstLine || song.firstLineKreyol || "View lyrics and details";
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
+  const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+    ? `http://localhost:3000`
     : "https://chant-desperance.org";
 
   // Use song media image if available, otherwise use the site's opengraph-image
