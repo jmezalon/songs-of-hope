@@ -51,18 +51,20 @@ export function SongDisplay({ song }: SongDisplayProps) {
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-3">
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  #{song.songNumber}
-                </Badge>
+                {song.songNumber && (
+                  <Badge variant="secondary" className="text-lg px-3 py-1">
+                    #{song.songNumber}
+                  </Badge>
+                )}
                 {song.language && (
                   <Badge variant="outline">
                     {song.language === "FRANCAIS"
                       ? "Français"
                       : song.language === "KREYOL"
-                      ? "Kreyòl"
-                      : song.language === "BILINGUAL"
-                      ? "Bilingual"
-                      : song.language}
+                        ? "Kreyòl"
+                        : song.language === "BILINGUAL"
+                          ? "Bilingual"
+                          : song.language}
                   </Badge>
                 )}
               </div>

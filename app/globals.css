@@ -49,6 +49,45 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Container centering fix */
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .container {
+    max-width: 1536px;
+  }
+}
+
 /* Disable dark mode - always use light theme */
 
 body {
@@ -59,6 +98,7 @@ body {
 
 /* Print Styles */
 @media print {
+
   /* Hide UI elements when printing */
   .print\:hidden,
   header,
@@ -109,7 +149,8 @@ body {
     margin-bottom: 8pt;
   }
 
-  p, li {
+  p,
+  li {
     font-size: 12pt;
     line-height: 1.5;
   }

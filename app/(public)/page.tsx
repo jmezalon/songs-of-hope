@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Music, Search, BookOpen, TrendingUp, Clock } from "lucide-react";
-import { PublicSearchBar } from "@/components/search/public-search-bar";
+import { Search, BookOpen, TrendingUp, Clock } from "lucide-react";
+import { SearchBarWrapper } from "./search-bar-wrapper";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +107,7 @@ export default async function HomePage() {
             {/* Search Bar */}
             <div className="pt-8">
               <Suspense fallback={<SearchFallback />}>
-                <PublicSearchBar />
+                <SearchBarWrapper />
               </Suspense>
             </div>
 
@@ -143,9 +143,11 @@ export default async function HomePage() {
                   <div className="space-y-3">
                     <div className="flex items-start justify-between">
                       <div>
-                        <Badge variant="secondary">#{song.songNumber}</Badge>
+                        {song.songNumber && (
+                          <Badge variant="secondary">#{song.songNumber}</Badge>
+                        )}
                         {song.language && (
-                          <Badge variant="outline" className="ml-2">
+                          <Badge variant="outline" className={song.songNumber ? "ml-2" : ""}>
                             {song.language === "FRANCAIS" ? "FR" : song.language === "KREYOL" ? "KR" : "Bilingual"}
                           </Badge>
                         )}
@@ -193,7 +195,9 @@ export default async function HomePage() {
                 <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
                   <div className="space-y-3">
                     <div className="flex items-start justify-between">
-                      <Badge variant="secondary">#{song.songNumber}</Badge>
+                      {song.songNumber && (
+                        <Badge variant="secondary">#{song.songNumber}</Badge>
+                      )}
                       {song.language && (
                         <Badge variant="outline">
                           {song.language === "FRANCAIS" ? "FR" : song.language === "KREYOL" ? "KR" : "Bilingual"}

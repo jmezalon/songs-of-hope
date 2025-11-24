@@ -55,7 +55,7 @@ export function SongActions({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${songNumber}. ${title}`,
+          title: songNumber ? `${songNumber}. ${title}` : title,
           text: `Check out this hymn from Chant d'Espérance`,
           url,
         });

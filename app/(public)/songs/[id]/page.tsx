@@ -99,7 +99,8 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
     };
   }
 
-  const title = song.title || song.titleKreyol || `Song #${song.songNumber}`;
+  const titleText = song.title || song.titleKreyol || (song.songNumber ? `Song #${song.songNumber}` : "Untitled Song");
+  const fullTitle = song.songNumber ? `${song.songNumber}. ${titleText}` : titleText;
   const description = song.firstLine || song.firstLineKreyol || "View lyrics and details";
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
@@ -111,10 +112,10 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
 
   return {
     metadataBase: new URL(baseUrl),
-    title: `${song.songNumber}. ${title} - Chant d'Espérance`,
+    title: `${fullTitle} - Chant d'Espérance`,
     description,
     openGraph: {
-      title: `${song.songNumber}. ${title}`,
+      title: fullTitle,
       description,
       type: "music.song",
       url: `/songs/${id}`,
@@ -124,13 +125,13 @@ export async function generateMetadata({ params }: SongPageProps): Promise<Metad
           url: imageUrl,
           width: 1200,
           height: 630,
-          alt: `${title} - Chant d'Espérance`,
+          alt: `${titleText} - Chant d'Espérance`,
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${song.songNumber}. ${title}`,
+      title: fullTitle,
       description,
       creator: "@ChantEsperance",
       site: "@ChantEsperance",

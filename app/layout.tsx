@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ? process.env.NEXT_PUBLIC_APP_URL : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
   alternates: {
     canonical: '/',
   },
@@ -38,14 +38,6 @@ export const metadata: Metadata = {
     siteName: "Chant d'Espérance - Songs of Hope",
     locale: 'en_US',
     type: 'website',
-    images: [
-      {
-        url: '/opengraph-image',
-        width: 1200,
-        height: 630,
-        alt: "Chant d'Espérance - Digital Haitian Hymnal",
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
@@ -53,7 +45,6 @@ export const metadata: Metadata = {
     description: "🎵 Complete Haitian Adventist Hymnal • Bilingual Lyrics (Français & Kreyòl) • Projection Mode • Search & Browse • Create Playlists",
     creator: '@ChantEsperance',
     site: '@ChantEsperance',
-    images: ['/twitter-image'],
   },
   robots: {
     index: true,
@@ -66,11 +57,6 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/icon.svg", type: "image/svg+xml" }],
-  },
   manifest: '/site.webmanifest',
 };
 
@@ -80,13 +66,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <meta name="theme-color" content="#9333ea" />
       </head>
       <body
         className="font-sans antialiased"
+        suppressHydrationWarning
       >
         <SessionProvider>
           {children}

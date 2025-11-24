@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -32,7 +32,7 @@ interface SearchResult {
   matchContext?: string
 }
 
-export function PublicSearchBar() {
+export const PublicSearchBar = forwardRef<{ focus: () => void }>(function PublicSearchBar(props, ref) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -40,8 +40,23 @@ export function PublicSearchBar() {
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const debouncedQuery = useDebounce(query, 300)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Expose focus method via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      inputRef.current?.focus()
+    }
+  }))
+
+  // Auto-focus when focus parameter is present
+  useEffect(() => {
+    if (searchParams.get('focus') === 'search') {
+      inputRef.current?.focus()
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
@@ -158,6 +173,7 @@ export function PublicSearchBar() {
             }
           }}
           className="h-14 pl-12 pr-12 text-lg shadow-lg"
+          suppressHydrationWarning
         />
         {isLoading && (
           <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 animate-spin" />
@@ -173,16 +189,17 @@ export function PublicSearchBar() {
                 key={song.id}
                 onClick={() => handleResultClick(song.id)}
                 onMouseEnter={() => setSelectedIndex(index)}
-                className={`p-4 rounded-lg cursor-pointer transition-colors ${
-                  selectedIndex === index ? "bg-primary/10" : "hover:bg-gray-50"
-                }`}
+                className={`p-4 rounded-lg cursor-pointer transition-colors ${selectedIndex === index ? "bg-primary/10" : "hover:bg-gray-50"
+                  }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="secondary" className="text-xs">
-                        #{song.songNumber}
-                      </Badge>
+                      {song.songNumber && (
+                        <Badge variant="secondary" className="text-xs">
+                          #{song.songNumber}
+                        </Badge>
+                      )}
                       {song.language && (
                         <Badge variant="outline" className="text-xs">
                           {song.language === "FRANCAIS" ? "FR" : song.language === "KREYOL" ? "KR" : "Bilingual"}
@@ -234,4 +251,4 @@ export function PublicSearchBar() {
       )}
     </div>
   );
-}
+});
