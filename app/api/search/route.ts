@@ -317,52 +317,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Try Typesense search if enabled and configured
+    // Check if Typesense is configured (will be used as fallback)
     const typesenseConfigured =
       process.env.NEXT_PUBLIC_TYPESENSE_HOST &&
       process.env.TYPESENSE_ADMIN_API_KEY
 
-    if (useTypesense && typesenseConfigured && !adminMode) {
-      try {
-        const typesenseResults = await searchWithTypesense({
-          query,
-          limit,
-          language,
-          collectionId,
-          sectionId,
-          themes,
-          adminMode,
-        })
-
-        // Save search history (optional - don't block the response)
-        if (typesenseResults.results.length > 0) {
-          prisma.searchHistory
-            .create({
-              data: {
-                query,
-                resultCount: typesenseResults.results.length,
-                songId: typesenseResults.results[0].id,
-              },
-            })
-            .catch((error) => {
-              console.error("Failed to save search history:", error)
-            })
-        }
-
-        return NextResponse.json({
-          query,
-          results: typesenseResults.results,
-          total: typesenseResults.total,
-          facets: typesenseResults.facets,
-          source: "typesense",
-        })
-      } catch (typesenseError) {
-        console.error("Typesense search failed, falling back to database:", typesenseError)
-        // Fall through to database search
-      }
-    }
-
-    // Fallback to database search
+    // Search database first
     const lowerQuery = query.toLowerCase()
 
     // Build OR conditions for search
@@ -506,8 +466,9 @@ export async function POST(request: NextRequest) {
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, limit)
 
-    // Save search history (optional - don't block the response)
+    // If database search found results, return them
     if (sortedResults.length > 0) {
+      // Save search history (optional - don't block the response)
       prisma.searchHistory
         .create({
           data: {
@@ -519,12 +480,62 @@ export async function POST(request: NextRequest) {
         .catch((error) => {
           console.error("Failed to save search history:", error)
         })
+
+      return NextResponse.json({
+        query,
+        results: sortedResults,
+        total: sortedResults.length,
+        source: "database",
+      })
     }
 
+    // No database results found, try Typesense as fallback
+    if (useTypesense && typesenseConfigured && !adminMode) {
+      try {
+        console.log("Database search returned no results, falling back to Typesense")
+        const typesenseResults = await searchWithTypesense({
+          query,
+          limit,
+          language,
+          collectionId,
+          sectionId,
+          themes,
+          adminMode,
+        })
+
+        // Save search history (optional - don't block the response)
+        if (typesenseResults.results.length > 0) {
+          prisma.searchHistory
+            .create({
+              data: {
+                query,
+                resultCount: typesenseResults.results.length,
+                songId: typesenseResults.results[0].id,
+              },
+            })
+            .catch((error) => {
+              console.error("Failed to save search history:", error)
+            })
+        }
+
+        return NextResponse.json({
+          query,
+          results: typesenseResults.results,
+          total: typesenseResults.total,
+          facets: typesenseResults.facets,
+          source: "typesense",
+        })
+      } catch (typesenseError) {
+        console.error("Typesense fallback search failed:", typesenseError)
+        // Fall through to return empty database results
+      }
+    }
+
+    // Return empty database results
     return NextResponse.json({
       query,
-      results: sortedResults,
-      total: sortedResults.length,
+      results: [],
+      total: 0,
       source: "database",
     })
   } catch (error) {
@@ -570,37 +581,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Try Typesense search if enabled and configured
+    // Check if Typesense is configured (will be used as fallback)
     const typesenseConfigured =
       process.env.NEXT_PUBLIC_TYPESENSE_HOST &&
       process.env.TYPESENSE_ADMIN_API_KEY
 
-    if (useTypesense && typesenseConfigured) {
-      try {
-        const typesenseResults = await searchWithTypesense({
-          query,
-          limit,
-          language: language && language !== "all" ? language : undefined,
-          collectionId: collectionId && collectionId !== "all" ? collectionId : undefined,
-          sectionId: sectionId && sectionId !== "all" ? sectionId : undefined,
-          themes: undefined,
-          adminMode: false,
-        })
-
-        return NextResponse.json({
-          query,
-          results: typesenseResults.results,
-          total: typesenseResults.total,
-          facets: typesenseResults.facets,
-          source: "typesense",
-        })
-      } catch (typesenseError) {
-        console.error("Typesense search failed, falling back to database:", typesenseError)
-        // Fall through to database search
-      }
-    }
-
-    // Fallback to database search
+    // Search database first
     const lowerQuery = query.toLowerCase()
 
     // Build OR conditions for search
@@ -760,10 +746,48 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, limit)
 
+    // If database search found results, return them
+    if (sortedResults.length > 0) {
+      return NextResponse.json({
+        query,
+        results: sortedResults,
+        total: sortedResults.length,
+        source: "database",
+      })
+    }
+
+    // No database results found, try Typesense as fallback
+    if (useTypesense && typesenseConfigured) {
+      try {
+        console.log("Database search returned no results, falling back to Typesense")
+        const typesenseResults = await searchWithTypesense({
+          query,
+          limit,
+          language: language && language !== "all" ? language : undefined,
+          collectionId: collectionId && collectionId !== "all" ? collectionId : undefined,
+          sectionId: sectionId && sectionId !== "all" ? sectionId : undefined,
+          themes: undefined,
+          adminMode: false,
+        })
+
+        return NextResponse.json({
+          query,
+          results: typesenseResults.results,
+          total: typesenseResults.total,
+          facets: typesenseResults.facets,
+          source: "typesense",
+        })
+      } catch (typesenseError) {
+        console.error("Typesense fallback search failed:", typesenseError)
+        // Fall through to return empty database results
+      }
+    }
+
+    // Return empty database results
     return NextResponse.json({
       query,
-      results: sortedResults,
-      total: sortedResults.length,
+      results: [],
+      total: 0,
       source: "database",
     })
   } catch (error) {

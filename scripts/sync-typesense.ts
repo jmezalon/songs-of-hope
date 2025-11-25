@@ -17,6 +17,7 @@ import {
   SONGS_COLLECTION_NAME,
   songsCollectionSchema,
 } from "../lib/typesense"
+import { resetSyncState } from "../lib/auto-sync"
 
 const prisma = new PrismaClient()
 
@@ -145,6 +146,9 @@ async function syncSongs() {
   }
 
   console.log("\n✨ Sync completed!\n")
+
+  // Reset the auto-sync tracking state
+  await resetSyncState()
 }
 
 // Main execution

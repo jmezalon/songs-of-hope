@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import type { SongFormValues } from "@/lib/validations/song"
 import type { Prisma, Song } from "@prisma/client"
+import { checkAndSyncIfNeeded } from "@/lib/auto-sync"
 
 export class SongServiceError extends Error {
   status: number
@@ -233,7 +234,7 @@ export async function createSongWithRelations(data: SongFormValues) {
     )
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const createdSong = await tx.song.create({
       data: baseSongData(data, collectionId),
     })
@@ -270,6 +271,13 @@ export async function createSongWithRelations(data: SongFormValues) {
       },
     })
   })
+
+  // Check if we need to sync to Typesense (after transaction completes)
+  checkAndSyncIfNeeded().catch((error) => {
+    console.error("Auto-sync check failed:", error)
+  })
+
+  return result
 }
 
 export async function updateSongWithRelations(songId: string, data: SongFormValues) {

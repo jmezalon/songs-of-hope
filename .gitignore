@@ -51,3 +51,6 @@ next-env.d.ts
 # Service Worker (generated)
 /public/sw.js
 /public/sw.js.map
+
+# Typesense sync state
+.typesense-sync-state.json
