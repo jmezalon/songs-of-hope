@@ -198,9 +198,9 @@ export default function AdminLayout({
           {/* Navigation */}
           <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
             {navItems
-              // Restrict admin-only tabs like Users & Review Contributions
+              // Restrict admin-only tabs like Users, Review Contributions, and Collections & Sections
               .filter((item) => {
-                if (item.href === "/admin/users" || item.href === "/admin/contributions") {
+                if (item.href === "/admin/users" || item.href === "/admin/contributions" || item.href === "/admin/collections") {
                   return session.user.role === "ADMIN"
                 }
                 return true

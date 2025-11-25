@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatNumber, formatDate, cn } from "@/lib/utils"
 import { prisma } from "@/lib/prisma"
 import { ContributionStatus, type ContributionType } from "@prisma/client"
+import { getCurrentUser } from "@/lib/authorization"
 
 type LanguageCode = "FRANCAIS" | "KREYOL" | "BILINGUAL" | "ENGLISH" | "SPANISH"
 
@@ -88,6 +89,9 @@ const formatLanguageName = (code: string) =>
 
 export default async function AdminDashboard() {
   noStore()
+  const currentUser = await getCurrentUser()
+  const isAdmin = currentUser?.role === "ADMIN"
+
   const now = new Date()
   const oneWeekAgo = new Date(now)
   oneWeekAgo.setDate(now.getDate() - 7)
@@ -521,7 +525,10 @@ export default async function AdminDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className={cn(
+            "grid gap-3 sm:grid-cols-2",
+            isAdmin ? "lg:grid-cols-4" : "lg:grid-cols-3"
+          )}>
             <Link
               href="/admin/songs/new"
               className={cn(buttonVariants({ variant: "outline" }), "justify-start")}
@@ -529,13 +536,15 @@ export default async function AdminDashboard() {
               <Plus className="mr-2 h-4 w-4" />
               Add New Song
             </Link>
-            <Link
-              href="/admin/collections"
-              className={cn(buttonVariants({ variant: "outline" }), "justify-start")}
-            >
-              <BookOpen className="mr-2 h-4 w-4" />
-              Manage Collections
-            </Link>
+            {isAdmin && (
+              <Link
+                href="/admin/collections"
+                className={cn(buttonVariants({ variant: "outline" }), "justify-start")}
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                Manage Collections
+              </Link>
+            )}
             <Link
               href="/admin/themes"
               className={cn(buttonVariants({ variant: "outline" }), "justify-start")}
