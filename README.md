@@ -13,6 +13,8 @@ This platform provides a comprehensive digital hymnal experience for the Haitian
 - Comprehensive admin dashboard for song management
 - Responsive design optimized for mobile, tablet, and desktop
 
+ Keep it synced: Run npm run typesense:sync periodically or set up a cron job
+
 ## Tech Stack
 
 ### Frontend

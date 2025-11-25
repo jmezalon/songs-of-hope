@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { requireAdmin } from "@/lib/authorization"
+import { searchSongs } from "@/lib/typesense"
 
 // Validation schema for search request
 const searchSchema = z.object({
@@ -9,6 +10,12 @@ const searchSchema = z.object({
   limit: z.number().int().min(1).max(100).optional().default(10),
   includeVerses: z.boolean().optional().default(true),
   adminMode: z.boolean().optional().default(false), // Search all statuses in admin
+  useTypesense: z.boolean().optional().default(true), // Use Typesense if available
+  // Filters
+  language: z.string().optional(),
+  collectionId: z.string().optional(),
+  sectionId: z.string().optional(),
+  themes: z.array(z.string()).optional(),
 })
 
 interface MatchContext {
@@ -169,13 +176,136 @@ function calculateRelevance(
   return { score, matchedFields, matchContext }
 }
 
+/**
+ * Search using Typesense
+ */
+async function searchWithTypesense(params: {
+  query: string
+  limit: number
+  language?: string
+  collectionId?: string
+  sectionId?: string
+  themes?: string[]
+  adminMode?: boolean
+}) {
+  const { query, limit, language, collectionId, sectionId, themes, adminMode } = params
+
+  // Build filter string for Typesense
+  const filters: string[] = []
+
+  if (language) {
+    filters.push(`language:=${language}`)
+  }
+  if (collectionId) {
+    filters.push(`collectionId:=${collectionId}`)
+  }
+  if (sectionId) {
+    filters.push(`sectionId:=${sectionId}`)
+  }
+  if (themes && themes.length > 0) {
+    filters.push(`themes:=[${themes.map(t => `\`${t}\``).join(",")}]`)
+  }
+
+  const filterString = filters.length > 0 ? filters.join(" && ") : undefined
+
+  // Search with Typesense
+  const searchResult = await searchSongs({
+    query,
+    filters: filterString,
+    perPage: limit,
+    page: 1,
+  })
+
+  if (!searchResult.success || !searchResult.results) {
+    throw new Error(searchResult.error || "Typesense search failed")
+  }
+
+  // Convert Typesense results to our format
+  const results: SearchResult[] = (searchResult.results.hits || []).map((hit: any) => {
+    const doc = hit.document
+    const highlights = hit.highlights || []
+
+    // Determine matched fields and context from highlights
+    const matchedFields: string[] = []
+    const matchContext: MatchContext[] = []
+
+    highlights.forEach((highlight: any) => {
+      if (highlight.field === "title" || highlight.field === "titleKreyol") {
+        matchedFields.push(highlight.field)
+        matchContext.push({
+          type: "title",
+          text: highlight.snippet || doc[highlight.field],
+        })
+      } else if (highlight.field === "lyrics" || highlight.field === "lyricsKreyol") {
+        if (!matchedFields.includes("lyrics")) {
+          matchedFields.push("lyrics")
+        }
+        matchContext.push({
+          type: "lyrics",
+          text: highlight.snippet || doc[highlight.field]?.substring(0, 100),
+        })
+      } else if (highlight.field === "author") {
+        matchedFields.push("author")
+        matchContext.push({
+          type: "author",
+          text: doc.author,
+        })
+      } else if (highlight.field === "composer") {
+        matchedFields.push("composer")
+        matchContext.push({
+          type: "composer",
+          text: doc.composer,
+        })
+      }
+    })
+
+    return {
+      id: doc.id,
+      title: doc.title,
+      titleKreyol: doc.titleKreyol || null,
+      songNumber: doc.songNumber || null,
+      author: doc.author || null,
+      composer: doc.composer || null,
+      firstLine: doc.lyrics ? doc.lyrics.split("\n")[0] : null,
+      firstLineKreyol: doc.lyricsKreyol ? doc.lyricsKreyol.split("\n")[0] : null,
+      language: doc.language,
+      status: "PUBLISHED", // Typesense only has published songs
+      collection: {
+        name: doc.collectionName || "Unknown",
+      },
+      section: doc.sectionName ? {
+        name: doc.sectionName,
+      } : null,
+      relevanceScore: hit.text_match_info?.score || 0,
+      matchedFields,
+      matchContext,
+    }
+  })
+
+  return {
+    results,
+    total: searchResult.results.found || 0,
+    facets: searchResult.results.facet_counts || [],
+  }
+}
+
 // POST /api/search - Search songs by title, lyrics, author
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
     // Validate the request body
-    const { query, limit, includeVerses, adminMode } = searchSchema.parse(body)
+    const {
+      query,
+      limit,
+      includeVerses,
+      adminMode,
+      useTypesense,
+      language,
+      collectionId,
+      sectionId,
+      themes,
+    } = searchSchema.parse(body)
 
     if (adminMode) {
       const adminUser = await requireAdmin().catch(() => null)
@@ -187,6 +317,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Try Typesense search if enabled and configured
+    const typesenseConfigured =
+      process.env.NEXT_PUBLIC_TYPESENSE_HOST &&
+      process.env.TYPESENSE_ADMIN_API_KEY
+
+    if (useTypesense && typesenseConfigured && !adminMode) {
+      try {
+        const typesenseResults = await searchWithTypesense({
+          query,
+          limit,
+          language,
+          collectionId,
+          sectionId,
+          themes,
+          adminMode,
+        })
+
+        // Save search history (optional - don't block the response)
+        if (typesenseResults.results.length > 0) {
+          prisma.searchHistory
+            .create({
+              data: {
+                query,
+                resultCount: typesenseResults.results.length,
+                songId: typesenseResults.results[0].id,
+              },
+            })
+            .catch((error) => {
+              console.error("Failed to save search history:", error)
+            })
+        }
+
+        return NextResponse.json({
+          query,
+          results: typesenseResults.results,
+          total: typesenseResults.total,
+          facets: typesenseResults.facets,
+          source: "typesense",
+        })
+      } catch (typesenseError) {
+        console.error("Typesense search failed, falling back to database:", typesenseError)
+        // Fall through to database search
+      }
+    }
+
+    // Fallback to database search
     const lowerQuery = query.toLowerCase()
 
     // Build OR conditions for search
@@ -349,6 +525,7 @@ export async function POST(request: NextRequest) {
       query,
       results: sortedResults,
       total: sortedResults.length,
+      source: "database",
     })
   } catch (error) {
     console.error("Error searching songs:", error)
@@ -384,6 +561,7 @@ export async function GET(request: NextRequest) {
     const language = searchParams.get("language")
     const collectionId = searchParams.get("collectionId")
     const sectionId = searchParams.get("sectionId")
+    const useTypesense = searchParams.get("useTypesense") !== "false" // Default to true
 
     if (!query) {
       return NextResponse.json(
@@ -392,6 +570,37 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Try Typesense search if enabled and configured
+    const typesenseConfigured =
+      process.env.NEXT_PUBLIC_TYPESENSE_HOST &&
+      process.env.TYPESENSE_ADMIN_API_KEY
+
+    if (useTypesense && typesenseConfigured) {
+      try {
+        const typesenseResults = await searchWithTypesense({
+          query,
+          limit,
+          language: language && language !== "all" ? language : undefined,
+          collectionId: collectionId && collectionId !== "all" ? collectionId : undefined,
+          sectionId: sectionId && sectionId !== "all" ? sectionId : undefined,
+          themes: undefined,
+          adminMode: false,
+        })
+
+        return NextResponse.json({
+          query,
+          results: typesenseResults.results,
+          total: typesenseResults.total,
+          facets: typesenseResults.facets,
+          source: "typesense",
+        })
+      } catch (typesenseError) {
+        console.error("Typesense search failed, falling back to database:", typesenseError)
+        // Fall through to database search
+      }
+    }
+
+    // Fallback to database search
     const lowerQuery = query.toLowerCase()
 
     // Build OR conditions for search
@@ -555,6 +764,7 @@ export async function GET(request: NextRequest) {
       query,
       results: sortedResults,
       total: sortedResults.length,
+      source: "database",
     })
   } catch (error) {
     console.error("Error in GET search:", error)

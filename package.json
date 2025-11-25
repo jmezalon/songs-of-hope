@@ -10,7 +10,9 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "tsx prisma/seed.ts",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "typesense:sync": "tsx scripts/sync-typesense.ts",
+    "typesense:sync:reset": "tsx scripts/sync-typesense.ts --reset"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -40,6 +42,7 @@
     "serwist": "^9.2.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
+    "typesense": "^2.1.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
