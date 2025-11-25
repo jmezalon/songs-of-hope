@@ -80,9 +80,9 @@ export const DIFFICULTY_LEVELS = [
 
 // Media types
 export const MEDIA_TYPES = [
-  { value: "SHEET_MUSIC", label: "Sheet Music (PDF)", icon: "FileText" },
-  { value: "AUDIO", label: "Audio (MP3, WAV)", icon: "Music" },
   { value: "VIDEO", label: "Video (YouTube, Vimeo)", icon: "Video" },
+  { value: "AUDIO", label: "Audio (MP3, WAV)", icon: "Music" },
+  { value: "SHEET_MUSIC", label: "Sheet Music (PDF)", icon: "FileText" },
   { value: "IMAGE", label: "Image (JPG, PNG)", icon: "Image" },
 ] as const
 

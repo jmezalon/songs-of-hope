@@ -22,16 +22,16 @@ function generateId() {
 function createEmptyMedia(): MediaItem {
   return {
     id: generateId(),
-    type: "SHEET_MUSIC",
+    type: "VIDEO",
     url: "",
     title: "",
   }
 }
 
 const MEDIA_ICONS = {
-  SHEET_MUSIC: FileText,
-  AUDIO: Music,
   VIDEO: Video,
+  AUDIO: Music,
+  SHEET_MUSIC: FileText,
   IMAGE: ImageIcon,
 }
 
@@ -184,8 +184,8 @@ export function MediaManager({ media, onChange }: MediaManagerProps) {
                   item.type === "VIDEO"
                     ? "https://youtube.com/watch?v=..."
                     : item.type === "SHEET_MUSIC"
-                    ? "https://example.com/sheet-music.pdf"
-                    : "https://example.com/media"
+                      ? "https://example.com/sheet-music.pdf"
+                      : "https://example.com/media"
                 }
                 className="font-mono text-sm"
               />

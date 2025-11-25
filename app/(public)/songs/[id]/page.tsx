@@ -19,7 +19,7 @@ async function getSong(id: string) {
             orderBy: { lineNumber: "asc" },
           },
         },
-        orderBy: { verseNumber: "asc" },
+        orderBy: { sortOrder: "asc" },
       },
       themes: {
         include: {

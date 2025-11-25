@@ -165,7 +165,7 @@ export function ProjectionView({ song }: ProjectionViewProps) {
   };
 
   const getVerseLabel = (verse: any) => {
-    const type = verse.verseType;
+    const type = verse.type;
     const num = verse.verseNumber;
 
     switch (type) {
